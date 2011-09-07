@@ -1,0 +1,94 @@
+
+td.sideBar{
+  width:124px;
+  vertical-align:top;
+}
+td.mainBody {
+  width:600px;
+  vertical-align:top;
+}
+
+tr.d0 td {
+	background-color: #AAAAAA; 
+	color: #000000; 
+}
+tr.d0 th {
+	font-family: Lucida Sans Unicode, Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	background-color: #0000BB; color: White;
+}
+tr.darkBack td {
+	font-family: Lucida Sans Unicode, Arial, Helvetica, sans-serif;
+	color: #EEEEEE; 
+	background-color: #0000CC;
+}
+th {
+	font-family: Lucida Sans Unicode, Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	background-color: #3b4455; color: White;
+}
+.tbox{
+	
+	background-color: #FFFFFF;
+	font-family:  Arial, Helvetica, sans-serif;
+	font-size: 10px;	
+}
+body {
+	
+	background-color: #BB0000 ;
+	color: #000000 ;
+	font-family:  Arial, Helvetica, sans-serif;
+	font-size: 10px;	
+}
+p 
+{
+	font-size:larger;
+	color: #EEEEEE;
+}
+
+..link
+{
+	font-family: Arial, Helvetica, sans-serif;
+	color: #FFFFFF;
+	text-decoration: none;
+}
+A.th:link
+{
+	font-family: Lucida Sans Unicode, Arial, Helvetica, sans-serif;
+	color: #CCCCCC;
+	text-decoration: none;
+	
+}
+A.th:hover
+{
+	font-family: Lucida Sans Unicode, Arial, Helvetica, sans-serif;
+	color: #CCCCCC;
+	text-decoration: none;
+	
+}
+A:link
+{
+	font-family: Arial, Helvetica, sans-serif;
+	color: #CCCCCC;
+	text-decoration: none;
+	
+}
+A:active
+{
+	font-family: Arial, Helvetica, sans-serif;
+	color: #CCCCCC;
+	text-decoration: none;
+	
+}
+A:visited
+{	
+	font-family: Arial, Helvetica, sans-serif;
+	color: #CCCCCC;
+	text-decoration: none;
+}
+A:hover
+{
+	font-family: Arial, Helvetica, sans-serif;
+	color: #FFFFFF;
+	text-decoration: none;
+}
