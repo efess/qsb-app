@@ -1,5 +1,5 @@
 ﻿/*
-Copyright 2009-2010 Joe Lukacovic
+Copyright 2009-2011 Joe Lukacovic
 
 This file is part of QSBrowser.
 

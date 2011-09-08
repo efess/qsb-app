@@ -13,7 +13,7 @@ public class ServerManager
     /// <summary>
     /// Database Storage object
     /// </summary>
-    IDataSession _Store = null;
+    IDataSessionFactory _StoreFactory = null;
     DateTime lastQuery = DateTime.MinValue;
     private const int QUERY_SECOND_COUNT = 3;
     List<ServerDetail> _ServerDetail;
@@ -22,12 +22,12 @@ public class ServerManager
     /// Main constructor to initialize members
     /// </summary>
     /// <param name="pDatabasePath">Absolute path of SQLite database file</param>
-    public ServerManager(IDataSession pDataSession)
+    public ServerManager(IDataSessionFactory pDataSessionFactory)
     {
-        if (pDataSession == null)
+        if (pDataSessionFactory == null)
             throw new ArgumentNullException("ServerManager requires a datasession");
 
-        _Store = pDataSession;
+        _StoreFactory = pDataSessionFactory;
         _ServerDetail = new List<ServerDetail>();
 	}
 
@@ -35,14 +35,15 @@ public class ServerManager
     {
         get
         {
-            return _Store;
+            return _StoreFactory.GetDataSession();
         }
     }
 
     private void Refresh()
     {
+        
         _ServerDetail.Clear();
-        foreach (VServerDetail server in _Store.GetServerDetail())
+        foreach (VServerDetail server in Store.GetServerDetail())
         {
             if(server == null)
                 continue;

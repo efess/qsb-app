@@ -45,7 +45,7 @@
         // Set Paths
         try
         {
-            DataBridge.InitializeDatabase(connectionString, databaseEngine);
+            WebMain.DataFactory = DataBridge.InitializeDatabase(connectionString, databaseEngine);
         }
         catch (Exception ex)
         {

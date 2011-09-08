@@ -21,12 +21,13 @@ public static class WebMain
         get
         {
             if(serverMain == null)
-                serverMain = new ServerManager(DataBridge.GetSession());
+                serverMain = new ServerManager(DataFactory);
 
             return serverMain;
         }
     }
 
+    public static IDataSessionFactory DataFactory;
     public static Status WebStatus;
     public static ImageManager Images;
 }

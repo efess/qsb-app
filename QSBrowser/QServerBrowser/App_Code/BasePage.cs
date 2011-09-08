@@ -82,7 +82,7 @@ public class BasePage : System.Web.UI.Page
             if(HttpContext.Current.Items[HTTP_CONTEXT_STORE] == null)
             {
 
-                IDataSession sm = QSB.Data.DataBridge.GetSession();
+                IDataSession sm = WebMain.DataFactory.GetDataSession();
                 HttpContext.Current.Items[HTTP_CONTEXT_STORE] = sm;
                 return sm;
             }
