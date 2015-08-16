@@ -178,6 +178,25 @@ ServerMatchId,
 MatchStart
 );
 
+CREATE INDEX IDX_SERVERMATCH_END ON ServerMatch(
+ServerId,
+ServerMatchId,
+MatchEnd
+);
+
+CREATE INDEX IDX_SERVERMATCH_START_END ON ServerMatch(
+ServerId,
+ServerMatchId,
+MatchEnd,
+MatchStart
+);
+
+CREATE INDEX IDX_PLAYERMATCH_ ON PlayerMatch(
+ServerMatchId,
+PlayerId,
+Frags
+);
+
 CREATE TABLE ServerData (
 ServerDataId INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
 ServerId INTEGER  NOT NULL,
@@ -205,8 +224,6 @@ LastUrl TEXT  NULL,
 LastAccessed DateTime NULL
 );
 
-
-
 DROP PROCEDURE IF EXISTS spMatchDetail;
 
 DELIMITER //
@@ -218,12 +235,15 @@ BEGIN
 	GameServer.GameId,
 	GameServer.DNS as HostName,
 	GameServer.Port as Port,
+	GameServer.ServerId,
 	ServerData.Name as ServerName,
 	ServerMatch.ServerMatchId as MatchId,
 	ServerMatch.Map as Map,
-	ServerMatch.Modification as Modification,
-	UNIX_TIMESTAMP(ServerMatch.MatchStart) as MatchStart,
-	UNIX_TIMESTAMP(ServerMatch.MatchEnd) as MatchEnd,
+	--COALESCE(ServerMatch.Modification, GameServer.ModificationCode) as Modification,
+	GameServer.ModificationCode as Modification,
+	DATE_FORMAT(ServerMatch.MatchStart, '%Y-%m-%dT%TZ') as MatchStart,
+	DATE_FORMAT(ServerMatch.MatchEnd, '%Y-%m-%dT%TZ') as MatchEnd,
+	TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd,UTC_TIMESTAMP())) as MatchDuration,
 	Player.Alias as Alias,
 	Player.AliasBytes as AliasBytes,
 	Player.PlayerId as PlayerId,
@@ -233,11 +253,11 @@ BEGIN
 	PlayerMatch.ShirtColor as ShirtColor,
 	PlayerMatch.Skin as Skin,
 	PlayerMatch.Model as Model,
-	UNIX_TIMESTAMP(PlayerMatch.PlayerMatchStart) as PlayerMatchStart,
-	UNIX_TIMESTAMP(PlayerMatch.PlayerMatchEnd) as PlayerMatchEnd,
+	DATE_FORMAT(PlayerMatch.PlayerMatchStart, '%Y-%m-%dT%TZ') as PlayerMatchStart,
+	DATE_FORMAT(PlayerMatch.PlayerMatchEnd, '%Y-%m-%dT%TZ') as PlayerMatchEnd,
 	TIMESTAMPDIFF(SECOND, PlayerMatch.PlayerMatchStart, ifnull(PlayerMatch.PlayerMatchEnd,UTC_TIMESTAMP())) as PlayerStayDuration,
 	CASE WHEN Frags > 0 THEN
-	round(cast(PlayerMatch.Frags as DECIMAL)/cast((TIMESTAMPDIFF(SECOND, PlayerMatch.PlayerMatchStart, PlayerMatch.PlayerMatchEnd)) / 60 as DECIMAL),2)
+	round(PlayerMatch.Frags /((TIMESTAMPDIFF(SECOND, PlayerMatch.PlayerMatchStart, PlayerMatch.PlayerMatchEnd)) / 60),2)
 	ELSE 0
 	END as FPM
 	FROM PlayerMatch
@@ -245,11 +265,11 @@ BEGIN
 	inner join ServerMatch on (PlayerMatch.ServerMatchId = ServerMatch.ServerMatchId)
 	inner join GameServer on (ServerMatch.ServerId = GameServer.ServerId)
 	inner join ServerData on (ServerMatch.ServerId = ServerData.ServerId)
-	WHERE PlayerMatch.ServerMatchId = p_matchId;
+	WHERE PlayerMatch.ServerMatchId = p_matchId
+	ORDER BY PlayerMatch.Frags DESC;
 
 END //
 DELIMITER ;
-
 
 DROP PROCEDURE IF EXISTS spPlayerDetail;
 
@@ -264,7 +284,11 @@ BEGIN
 	alias_p.PlayerId as AliasPlayerId,
 	alias_p.Alias as Alias,
 	master_p.PlayerId as PlayerId,
-	(select UNIX_TIMESTAMP(ifnull(SessionEnd,UTC_TIMESTAMP()))
+	(select TIMESTAMPDIFF(SECOND, ifnull(SessionEnd,UTC_TIMESTAMP), UTC_TIMESTAMP())
+	FROM PlayerSession
+
+	where master_p.AliasId = LastAliasId order by SessionStart desc limit 1) as AliasLastSeenAgo,
+	(select DATE_FORMAT(ifnull(SessionEnd,UTC_TIMESTAMP()), '%Y-%m-%dT%TZ')
 	FROM PlayerSession
 
 	where master_p.AliasId = LastAliasId order by SessionStart desc limit 1) as AliasLastSeen,
@@ -272,10 +296,19 @@ BEGIN
 	FROM PlayerSession
 	INNER JOIN GameServer ON (GameServer.ServerId = PlayerSession.ServerId)
 	WHERE PlayerId = master_p.PlayerId order by SessionStart desc limit 1) as LastServer,
+	(SELECT GameServer.ServerId
+	FROM PlayerSession
+	INNER JOIN GameServer ON (GameServer.ServerId = PlayerSession.ServerId)
+	WHERE PlayerId = master_p.PlayerId order by SessionStart desc limit 1) as LastServerId,
 
-	(select UNIX_TIMESTAMP(ifnull(SessionEnd,UTC_TIMESTAMP()))
+
+	(select DATE_FORMAT(ifnull(SessionEnd,UTC_TIMESTAMP()), '%Y-%m-%dT%TZ')
 	FROM PlayerSession
 	where PlayerId = master_p.PlayerId order by SessionStart desc limit 1) as LastSeen,
+	
+	(select TIMESTAMPDIFF(SECOND, ifnull(SessionEnd,UTC_TIMESTAMP), UTC_TIMESTAMP())
+	FROM PlayerSession
+	where PlayerId = master_p.PlayerId order by SessionStart desc limit 1) as LastSeenAgo,
 
 	(select Map
 	FROM PlayerSession
@@ -305,7 +338,7 @@ BEGIN
 	FROM PlayerSession
 	WHERE PlayerId = master_p.PlayerId AND SessionStart >= Date_Add(Current_Date(),INTERVAL -(DayOfMonth(Current_Date())-1 ) DAY)) AS month_frags_sum,
 
-	(select round(cast(sum(FragCount) + sum(CurrentFrags) as DECIMAL)/cast(( sum( TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP()))  ) / 60) as DECIMAL),2)
+	(select round((sum(FragCount) + sum(CurrentFrags))/(( sum( TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP()))  ) / 60)),2)
 	FROM PlayerSession
 	WHERE PlayerId = master_p.PlayerId AND SessionStart >= Date_Add(Current_Date(),INTERVAL -(DayOfMonth(Current_Date())-1 ) DAY)) AS month_FPM      ,
 
@@ -317,7 +350,7 @@ BEGIN
 	FROM PlayerSession
 	WHERE PlayerId = master_p.PlayerId AND SessionStart >= Date_Add(Current_Date(),INTERVAL -(DayOfWeek(Current_Date())-1 ) DAY)) AS week_frags_sum,
 
-	(select round(cast(sum(FragCount) + sum(CurrentFrags) as DECIMAL)/cast(( sum( TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP()))  ) / 60) as DECIMAL),2)
+	(select round((sum(FragCount) + sum(CurrentFrags))/(( sum( TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP()))  ) / 60)),2)
 	FROM PlayerSession
 	WHERE PlayerId = master_p.PlayerId AND SessionStart >= Date_Add(Current_Date(),INTERVAL -(DayOfWeek(Current_Date())-1 ) DAY)) AS week_FPM      ,
 
@@ -355,23 +388,82 @@ END //
 DELIMITER ;
 
 
-
-DROP PROCEDURE IF EXISTS spPlayerMatches;
+DROP PROCEDURE IF EXISTS spServerMatches;
 
 DELIMITER //
-CREATE PROCEDURE spPlayerMatches (
-IN p_playerId INTEGER)
+CREATE PROCEDURE spServerMatches (
+IN p_serverId INTEGER,
+IN p_pageRecordCount INTEGER,
+IN p_pageRecordOffset INTEGER)
 BEGIN
-     SELECT
+	DECLARE SQLs VARCHAR(10000);
+	
+	SET @SQLs = CONCAT('SELECT
 	ServerMatch.ServerMatchId as MatchId,
-	UNIX_TIMESTAMP(ServerMatch.MatchStart) as MatchStart,
+	DATE_FORMAT(ServerMatch.MatchStart, ''%Y-%m-%dT%TZ'') as MatchStart,
 	GameServer.GameId as GameId,
 	GameServer.DNS as HostName,
 	GameServer.Port As Port,
 	ServerData.Name as ServerName,
 	GameServer.ServerId as ServerId,
 	ServerMatch.Map as Map,
-	ServerMatch.Modification as Modification,
+	GameServer.ModificationCode as Modification,
+	(SELECT Count(PlayerMatch.AliasId) FROM PlayerMatch WHERE ServerMatch.ServerMatchId = PlayerMatch.ServerMatchId) AS PlayerCount,
+	TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd,UTC_TIMESTAMP())) as MatchDuration
+	FROM ServerMatch
+	inner join GameServer on (ServerMatch.ServerId = GameServer.ServerId)
+	inner join ServerData on (ServerMatch.ServerId = ServerData.ServerId)
+	WHERE GameServer.ServerId = ',p_serverId, '
+	AND TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd,UTC_TIMESTAMP())) > 10
+	ORDER BY UNIX_TIMESTAMP(ServerMatch.MatchStart) DESC
+	LIMIT ', p_pageRecordCount, ' OFFSET ', p_pageRecordOffset, ';');
+	
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
+END //
+DELIMITER ;
+
+
+DROP PROCEDURE IF EXISTS spServerMatchesCount;
+
+DELIMITER //
+CREATE PROCEDURE spServerMatchesCount (
+IN p_serverId INTEGER)
+BEGIN
+	DECLARE SQLs VARCHAR(10000);
+	
+	SET @SQLs = CONCAT('SELECT Count(*) as RecordCount
+	FROM ServerMatch
+	inner join GameServer on (ServerMatch.ServerId = GameServer.ServerId)
+	inner join ServerData on (ServerMatch.ServerId = ServerData.ServerId)
+	WHERE GameServer.ServerId = ',p_serverId, ';');
+	
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
+END //
+DELIMITER ;
+
+
+DROP PROCEDURE IF EXISTS spPlayerMatches;
+
+DELIMITER //
+CREATE PROCEDURE spPlayerMatches (
+IN p_playerId INTEGER,
+IN p_pageRecordCount INTEGER,
+IN p_pageRecordOffset INTEGER)
+BEGIN
+	DECLARE SQLs VARCHAR(10000);
+	
+	SET @SQLs = CONCAT('SELECT
+	sm.ServerMatchId as MatchId,
+	DATE_FORMAT(sm.MatchStart, ''%Y-%m-%dT%TZ'')  as MatchStart,
+	GameServer.GameId as GameId,
+	GameServer.DNS as HostName,
+	GameServer.Port As Port,
+	ServerData.Name as ServerName,
+	GameServer.ServerId as ServerId,
+	sm.Map as Map,
+	GameServer.ModificationCode as Modification,
 	Player.Alias as Alias,
 	Player.PlayerId as PlayerId,
 	PlayerMatch.Frags as Frags,
@@ -379,18 +471,47 @@ BEGIN
 	PlayerMatch.ShirtColor as ShirtColor,
 	PlayerMatch.Skin as Skin,
 	PlayerMatch.Model as Model,
-	UNIX_TIMESTAMP(PlayerMatch.PlayerMatchStart) as PlayerJoinTime,
+	DATE_FORMAT(PlayerMatch.PlayerMatchStart, ''%Y-%m-%dT%TZ'')  as PlayerJoinTime,
 	TIMESTAMPDIFF(SECOND, PlayerMatch.PlayerMatchStart, ifnull(PlayerMatch.PlayerMatchEnd,UTC_TIMESTAMP())) as PlayerStayDuration
 	FROM PlayerMatch
 	inner join Player on (PlayerMatch.AliasId = Player.AliasId)
-	inner join ServerMatch on (PlayerMatch.ServerMatchId = ServerMatch.ServerMatchId)
-	inner join GameServer on (ServerMatch.ServerId = GameServer.ServerId)
-	inner join ServerData on (ServerMatch.ServerId = ServerData.ServerId)
-	WHERE PlayerMatch.PlayerId = p_playerId
-	ORDER BY UNIX_TIMESTAMP(ServerMatch.MatchStart) DESC
-	LIMIT 13;
+	inner join ServerMatch as sm on (PlayerMatch.ServerMatchId = sm.ServerMatchId)
+	inner join GameServer on (sm.ServerId = GameServer.ServerId)
+	inner join ServerData on (sm.ServerId = ServerData.ServerId)
+	WHERE EXISTS (SELECT * FROM PlayerMatch as pm1 WHERE pm1.ServerMatchId = sm.ServerMatchId AND pm1.Frags > 0)
+	AND PlayerMatch.PlayerId = ', p_playerId, '
+	AND TIMESTAMPDIFF(SECOND, PlayerMatch.PlayerMatchStart, ifnull(PlayerMatch.PlayerMatchEnd,UTC_TIMESTAMP())) > 10
+	ORDER BY UNIX_TIMESTAMP(sm.MatchStart) DESC
+	LIMIT ', p_pageRecordCount, ' OFFSET ', p_pageRecordOffset, ';');
+	
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
 END //
 DELIMITER ;
+
+DROP PROCEDURE IF EXISTS spPlayerMatchesCount;
+
+DELIMITER //
+CREATE PROCEDURE spPlayerMatchesCount (
+IN p_playerId INTEGER)
+BEGIN
+	DECLARE SQLs VARCHAR(10000);
+	
+	SET @SQLs = CONCAT('SELECT Count(*) as RecordCount
+	FROM PlayerMatch
+	inner join Player on (PlayerMatch.AliasId = Player.AliasId)
+	inner join ServerMatch as sm on (PlayerMatch.ServerMatchId = sm.ServerMatchId)
+	inner join GameServer on (sm.ServerId = GameServer.ServerId)
+	inner join ServerData on (sm.ServerId = ServerData.ServerId)
+	WHERE EXISTS (SELECT * FROM PlayerMatch as pm1 WHERE pm1.ServerMatchId = sm.ServerMatchId AND pm1.Frags > 0)
+	AND TIMESTAMPDIFF(SECOND, PlayerMatch.PlayerMatchStart, ifnull(PlayerMatch.PlayerMatchEnd,UTC_TIMESTAMP())) > 10
+	AND PlayerMatch.PlayerId = ', p_playerId, ';');
+	
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
+END //
+DELIMITER ;
+
 
 DROP VIEW IF EXISTS vPlayerSessionHourly;
 
@@ -628,6 +749,7 @@ group by
 	psView.ServerId;
 
 
+
 DROP VIEW IF EXISTS vServerDetail;
 
 CREATE VIEW vServerDetail AS
@@ -654,14 +776,14 @@ sd.ServerDataId as ServerDataId
 ,sd.ServerSettings as ServerSettings
 ,sd.Modification as Modification
 ,sd.PlayerData as PlayerData
-,UNIX_TIMESTAMP(sd.Timestamp) as Timestamp
+,sd.Timestamp as Timestamp
 ,sd.MaxPlayers as MaxPlayers
 ,sd.IpAddress as IpAddress
+,(SELECT MatchStart from ServerMatch WHERE ServerId = sd.ServerId ORDER BY MatchStart DESC LIMIT 1) as RecentActivity
 from
 GameServer gs
 inner join ServerData  sd
 ON gs.ServerId = sd.ServerId;
-
 
 
 DROP PROCEDURE IF EXISTS spAddUpdateGameServer;
@@ -862,7 +984,7 @@ BEGIN
 	FROM HistoricalHourlyLog
 		INNER JOIN GameServer on GameServer.ServerId = HistoricalHourlyLog.ServerId
 		INNER JOIN ServerData on ServerData.ServerId = HistoricalHourlyLog.ServerId
-	WHERE ServerId = p_serverId
+	WHERE HistoricalHourlyLog.ServerId = p_serverId
 	AND HistoricalDate >= p_fromDate
 	AND HistoricalDate <= p_toDate;
 
@@ -870,496 +992,428 @@ END //
 DELIMITER ;
 
 
-
-
-DROP PROCEDURE IF EXISTS spPlayerLookup;
+DROP PROCEDURE IF EXISTS spPlayerLookupCount;
 
 DELIMITER //
 
-CREATE PROCEDURE spPlayerLookup (
+CREATE PROCEDURE spPlayerLookupCount (
+	IN p_gameId INTEGER,
 	IN p_aliasPart TEXT)
 
 BEGIN
-	SELECT 	PlayerId,
-		AliasBytes,
-		Alias
 	
-	FROM 	Player
-	WHERE	Alias like CONCAT(p_aliasPart, '%')
-	LIMIT 	10;
+	DECLARE SQLs VARCHAR(10000);
+	
+	SET @SQLs = CONCAT('SELECT Count(*) as RecordCount
+	FROM
+		(SELECT *
+		FROM 	Player
+		WHERE	Alias = ''', p_aliasPart, '''
+		AND		GameId = ', p_gameId, '
+		UNION
+		SELECT 	*
+		FROM 	Player
+		WHERE	Alias like ''', p_aliasPart, '%''
+		AND		GameId = ', p_gameId, ')
+	AS sub;');
+	
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
 
 END //
 DELIMITER ;
+
+
+
 DROP PROCEDURE IF EXISTS spPlayerLookup;
 
 DELIMITER //
 
 CREATE PROCEDURE spPlayerLookup (
-	IN p_aliasPart TEXT)
+	IN p_gameId INTEGER,
+	IN p_aliasPart TEXT,
+	IN p_pageRecordCount INTEGER,
+	IN p_pageRecordOffset INTEGER)
 
 BEGIN
 	
-	SELECT 	PlayerId,
-		AliasBytes,
-		Alias
-
-	FROM 	Player
-	WHERE	Alias = p_aliasPart	
+	DECLARE SQLs VARCHAR(10000);
+	
+	SET @SQLs = CONCAT('SELECT 	master_p.PlayerId,
+		master_p.AliasBytes,
+		master_p.Alias,
+			(select TIMESTAMPDIFF(SECOND, ifnull(SessionEnd,UTC_TIMESTAMP), UTC_TIMESTAMP())
+			FROM PlayerSession
+			where PlayerId = master_p.PlayerId order by SessionStart desc limit 1) as LastSeenAgo
+	FROM 	Player as master_p
+	WHERE	master_p.Alias = ''', p_aliasPart, '''
+	AND		master_p.GameId = ', p_gameId, '
 	UNION
-	SELECT 	PlayerId,
-		AliasBytes,
-		Alias
+	SELECT 	master_p.PlayerId,
+		master_p.AliasBytes,
+		master_p.Alias,
+			(select TIMESTAMPDIFF(SECOND, ifnull(SessionEnd,UTC_TIMESTAMP), UTC_TIMESTAMP())
+			FROM PlayerSession
+			where PlayerId = master_p.PlayerId order by SessionStart desc limit 1) as LastSeenAgo
 	
-	FROM 	Player
-	WHERE	Alias like CONCAT(p_aliasPart, '%')
-	LIMIT 	10;
-
+	FROM 	Player as master_p
+	WHERE	master_p.Alias like ''', p_aliasPart, '%''
+	AND		master_p.GameId = ', p_gameId, '
+	LIMIT ', p_pageRecordCount, ' OFFSET ', p_pageRecordOffset, ';');
+	
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
+	
 END //
 DELIMITER ;
 
 
-DROP TABLE IF EXISTS StatsServerMatchFrags;
-
-CREATE TABLE StatsServerMatchFrags (
-	StatsServerMatchFragsId INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
-	Date DATETIME NULL,
-	Span varchar(50) NULL,
-	ServerId INTEGER NULL,
-	PlayerId INTEGER NULL,
-	ServerMatchId INTEGER NULL,
-	Position INTEGER NULL,
-	Frags INTEGER NULL
-);
-
-
-DROP TABLE IF EXISTS StatsServerMatchFPM;
-
-CREATE TABLE StatsServerMatchFPM (
-	StatsServerMatchFPMId INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
-	Date DATETIME  NULL,
-	Span varchar(50) NULL,
-	ServerId INTEGER NULL,
-	PlayerId INTEGER NULL,
-	ServerMatchId INTEGER NULL,
-	Position INTEGER NULL,
-	FPM FLOAT NULL
-);
-
-
-DROP TABLE IF EXISTS StatsServerTimePlayed;
-
-CREATE TABLE StatsServerTimePlayed (
-	StatsServerTimePlayedId INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
-	Date DATETIME  NULL,
-	Span varchar(50) NULL,
-	ServerId INTEGER NULL,
-	PlayerId INTEGER NULL,
-	Position INTEGER NULL,
-	TimePlayed INTEGER NULL
-);
-
-DROP TABLE IF EXISTS StatsServerFrags;
-
-CREATE TABLE StatsServerFrags (
-	StatsServerFragsId INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
-	Date DATETIME  NULL,
-	Span varchar(50) NULL,
-	ServerId INTEGER NULL,
-	PlayerId INTEGER NULL,
-	Position INTEGER NULL,
-	Frags INTEGER NULL
-);
-
-
-DROP PROCEDURE IF EXISTS spProcessServerStats;
+DROP PROCEDURE IF EXISTS spPlayerAliasLookupCount;
 
 DELIMITER //
 
-CREATE PROCEDURE spProcessServerStats (
-	IN p_date DATETIME,
-	IN p_serverId INTEGER)
+CREATE PROCEDURE spPlayerAliasLookupCount (
+	IN p_gameId INTEGER,
+	IN p_playerId TEXT)
 
 BEGIN
-	DELETE FROM StatsServerMatchFrags WHERE Date = p_date AND ServerId = p_serverId;
-	DELETE FROM StatsServerMatchFPM WHERE Date = p_date AND ServerId = p_serverId;
-	DELETE FROM StatsServerTimePlayed WHERE Date = p_date AND ServerId = p_serverId;
-	DELETE FROM StatsServerFrags WHERE Date = p_date AND ServerId = p_serverId;
 	
-	-- Frags / Week
-		INSERT INTO StatsServerMatchFrags (Date, Span, ServerId, PlayerId, ServerMatchId, Frags, Position)
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Week' as Span,
-						p_serverId,
-						pm.PlayerId,
-						sm.ServerMatchId,
-						Frags
-			FROM 			PlayerMatch as pm
-			INNER JOIN		ServerMatch as sm
-				ON		sm.ServerMatchId = pm.ServerMatchId
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = sm.ServerId
-			WHERE			pm.PlayerMatchStart >= Date_Add(p_date,INTERVAL -(DayOfWeek(p_date)-1 ) DAY)
-			AND			pm.PlayerMatchStart <= p_date			
-			AND			sm.ServerId = p_serverId
-			ORDER BY		Frags DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
+	DECLARE SQLs VARCHAR(10000);
 	
-	-- Frags / Month
-		INSERT INTO StatsServerMatchFrags (Date, Span, ServerId, PlayerId, ServerMatchId, Frags, Position)
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Month' as Span,
-						p_serverId,
-						pm.PlayerId,
-						sm.ServerMatchId,
-						Frags
-			FROM 			PlayerMatch as pm
-			INNER JOIN		ServerMatch as sm
-				ON		sm.ServerMatchId = pm.ServerMatchId
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = sm.ServerId
-			WHERE			pm.PlayerMatchStart >= Date_Add(p_date,INTERVAL -(DayOfmonth(p_date)-1 ) DAY)
-			AND			pm.PlayerMatchStart <= p_date
-			AND			gs.ServerId = p_serverId
-			ORDER BY		Frags DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-	-- Frags / Year
-		INSERT INTO StatsServerMatchFrags (Date, Span, ServerId, PlayerId, ServerMatchId, Frags, Position)
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Year' as Span,
-						p_serverId,
-						pm.PlayerId,
-						sm.ServerMatchId,
-						Frags
-			FROM 			PlayerMatch as pm
-			INNER JOIN		ServerMatch as sm
-				ON		sm.ServerMatchId = pm.ServerMatchId
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = sm.ServerId
-			WHERE			pm.PlayerMatchStart >= Date_Add(p_date,INTERVAL -(DayOfYear(p_date)-1 ) DAY)
-			AND			pm.PlayerMatchStart <= p_date
-			AND			gs.ServerId = p_serverId
-			ORDER BY		Frags DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
+	SET @SQLs = CONCAT('SELECT COUNT(*) as RecordCount
+FROM 		Player as master_p
+INNER JOIN 	Player as slave_p
+		ON (INSTR(slave_p.IPAddress, ''.'') > 0 
+			AND master_p.IPAddress like CONCAT(LEFT(slave_p.IPAddress,LENGTH(slave_p.IPAddress) - INSTR(REVERSE(slave_p.IPAddress),''.'')), ''%''))
+WHERE INSTR(master_p.IPAddress,''.'') > 0
+AND		master_p.PlayerId = ', p_playerId, ';');
 	
-	-- Frags / AllTime
-		INSERT INTO StatsServerMatchFrags (Date, Span, ServerId, PlayerId, ServerMatchId, Frags, Position)
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'AllTime' as Span,
-						p_serverId,
-						pm.PlayerId,
-						sm.ServerMatchId,
-						Frags
-			FROM 			PlayerMatch as pm
-			INNER JOIN		ServerMatch as sm
-				ON		sm.ServerMatchId = pm.ServerMatchId
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = sm.ServerId
-			WHERE			pm.PlayerMatchStart <= p_date			
-			AND			gs.ServerId = p_serverId
-			ORDER BY		Frags DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
--- -----------------------------------------------	
-
-	-- FPM / Week
-		INSERT INTO StatsServerMatchFPM (Date, Span, ServerId, PlayerId, ServerMatchId, FPM, Position)
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Week' as Span,
-						p_serverId,
-						pm.PlayerId,
-						sm.ServerMatchId,
-						round(cast(pm.Frags as DECIMAL)/cast(( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) / 60) as DECIMAL),2)
-			FROM 			PlayerMatch as pm
-			INNER JOIN		ServerMatch as sm
-				ON		sm.ServerMatchId = pm.ServerMatchId
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = sm.ServerId
-			WHERE			pm.PlayerMatchStart >= Date_Add(p_date,INTERVAL -(DayOfWeek(p_date)-1 ) DAY)
-			AND			pm.PlayerMatchStart <= p_date			
-			AND			gs.ServerId = p_serverId
-			ORDER BY		round(cast(pm.Frags as DECIMAL)/cast(( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) / 60) as DECIMAL),2) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
-	-- FPM / Month
-		INSERT INTO StatsServerMatchFPM (Date, Span, ServerId, PlayerId, ServerMatchId, FPM, Position)
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Month' as Span,
-						p_serverId,
-						pm.PlayerId,
-						sm.ServerMatchId,
-						round(cast(pm.Frags as DECIMAL)/cast(( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) / 60) as DECIMAL),2)
-			FROM 			PlayerMatch as pm
-			INNER JOIN		ServerMatch as sm
-				ON		sm.ServerMatchId = pm.ServerMatchId
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = sm.ServerId
-			WHERE			pm.PlayerMatchStart >= Date_Add(p_date,INTERVAL -(DayOfmonth(p_date)-1 ) DAY)
-			AND			pm.PlayerMatchStart <= p_date			
-			AND			gs.ServerId = p_serverId
-			ORDER BY		round(cast(pm.Frags as DECIMAL)/cast(( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) / 60) as DECIMAL),2) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-	-- FPM / Year
-		INSERT INTO StatsServerMatchFPM (Date, Span, ServerId, PlayerId, ServerMatchId, FPM, Position)
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Year' as Span,
-						p_serverId,
-						pm.PlayerId,
-						sm.ServerMatchId,
-						round(cast(pm.Frags as DECIMAL)/cast(( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) / 60) as DECIMAL),2)
-			FROM 			PlayerMatch as pm
-			INNER JOIN		ServerMatch as sm
-				ON		sm.ServerMatchId = pm.ServerMatchId
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = sm.ServerId
-			WHERE			pm.PlayerMatchStart >= Date_Add(p_date,INTERVAL -(DayOfYear(p_date)-1 ) DAY)
-			AND			pm.PlayerMatchStart <= p_date			
-			AND			gs.ServerId = p_serverId
-			ORDER BY		round(cast(pm.Frags as DECIMAL)/cast(( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) / 60) as DECIMAL),2) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
-	-- FPM / AllTime
-		INSERT INTO StatsServerMatchFPM (Date, Span, ServerId, PlayerId, ServerMatchId, FPM, Position)
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'AllTime' as Span,
-						p_serverId,
-						pm.PlayerId,
-						sm.ServerMatchId,
-						round(cast(pm.Frags as DECIMAL)/cast(( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) / 60) as DECIMAL),2)
-			FROM 			PlayerMatch as pm
-			INNER JOIN		ServerMatch as sm
-				ON		sm.ServerMatchId = pm.ServerMatchId
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = sm.ServerId
-			WHERE			pm.PlayerMatchStart <= p_date			
-			AND			gs.ServerId = p_serverId
-			ORDER BY		round(cast(pm.Frags as DECIMAL)/cast(( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) / 60) as DECIMAL),2) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
--- ------------------------------------------
-
-	-- TimeSpent / Week
-		INSERT INTO StatsServerTimePlayed (Date, Span, ServerId, PlayerId, TimePlayed, Position )
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Week' as Span,
-						p_serverId,
-						ps.PlayerId,
-						SUM(TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP())))
-			FROM 			PlayerSession as ps
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = ps.ServerId
-			WHERE			ps.SessionStart >= Date_Add(p_date,INTERVAL -(DayOfWeek(p_date)-1 ) DAY)
-			AND			ps.SessionStart <= p_date
-			AND			gs.ServerId = p_serverId
-			GROUP BY		ps.PlayerId
-			ORDER BY		SUM(TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP()))) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
-
-	-- TimeSpent / Month
-		INSERT INTO StatsServerTimePlayed (Date, Span, ServerId, PlayerId, TimePlayed, Position )
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Month' as Span,
-						p_serverId,
-						ps.PlayerId,
-						SUM(TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP())))
-			FROM 			PlayerSession as ps
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = ps.ServerId
-			WHERE			ps.SessionStart >= Date_Add(p_date,INTERVAL -(DayOfmonth(p_date)-1 ) DAY)
-			AND			ps.SessionStart <= p_date
-			AND			gs.ServerId = p_serverId
-			GROUP BY		ps.PlayerId
-			ORDER BY		SUM(TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP()))) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
-	-- TimeSpent / Year
-		INSERT INTO StatsServerTimePlayed (Date, Span, ServerId, PlayerId, TimePlayed, Position )
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Year' as Span,
-						p_serverId,
-						ps.PlayerId,
-						SUM(TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP())))
-			FROM 			PlayerSession as ps
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = ps.ServerId
-			WHERE			ps.SessionStart >= Date_Add(p_date,INTERVAL -(DayOfYear(p_date)-1 ) DAY)
-			AND			ps.SessionStart <= p_date
-			AND			gs.ServerId = p_serverId
-			GROUP BY		ps.PlayerId
-			ORDER BY		SUM(TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP()))) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
-	-- TimeSpent / AllTime
-		INSERT INTO StatsServerTimePlayed (Date, Span, ServerId, PlayerId, TimePlayed, Position )
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'AllTime' as Span,
-						p_serverId,
-						ps.PlayerId,
-						SUM(TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP())))
-			FROM 			PlayerSession as ps
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = ps.ServerId
-			WHERE			ps.SessionStart <= p_date
-			AND			gs.ServerId = p_serverId
-			GROUP BY		ps.PlayerId
-			ORDER BY		SUM(TIMESTAMPDIFF(SECOND, SessionStart, ifnull(SessionEnd,UTC_TIMESTAMP()))) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
--- ------------------------------------------
-
-	-- TotalFrags / Week
-		INSERT INTO StatsServerFrags (Date, Span, ServerId, PlayerId, Frags, Position )
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Week' as Span,
-						p_serverId,
-						ps.PlayerId,
-						sum(FragCount) + sum(CurrentFrags)
-			FROM 			PlayerSession as ps
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = ps.ServerId
-			WHERE			ps.SessionStart >= Date_Add(p_date,INTERVAL -(DayOfWeek(p_date)-1 ) DAY)
-			AND			ps.SessionStart <= p_date
-			AND			gs.ServerId = p_serverId
-			GROUP BY		ps.PlayerId
-			ORDER BY		sum(FragCount) + sum(CurrentFrags) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
-
-	-- TotalFrags / Month
-		INSERT INTO StatsServerFrags (Date, Span, ServerId, PlayerId, Frags, Position )
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Month' as Span,
-						p_serverId,
-						ps.PlayerId,
-						sum(FragCount) + sum(CurrentFrags)
-			FROM 			PlayerSession as ps
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = ps.ServerId
-			WHERE			ps.SessionStart >= Date_Add(p_date,INTERVAL -(DayOfmonth(p_date)-1 ) DAY)
-			AND			ps.SessionStart <= p_date
-			AND			gs.ServerId = p_serverId
-			GROUP BY		ps.PlayerId
-			ORDER BY		sum(FragCount) + sum(CurrentFrags) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
-	-- TotalFrags / Year
-		INSERT INTO StatsServerFrags (Date, Span, ServerId, PlayerId, Frags, Position )
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'Year' as Span,
-						p_serverId,
-						ps.PlayerId,
-						sum(FragCount) + sum(CurrentFrags)
-			FROM 			PlayerSession as ps
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = ps.ServerId
-			WHERE			ps.SessionStart >= Date_Add(p_date,INTERVAL -(DayOfYear(p_date)-1 ) DAY)
-			AND			ps.SessionStart <= p_date
-			AND			gs.ServerId = p_serverId
-			GROUP BY		ps.PlayerId
-			ORDER BY		sum(FragCount) + sum(CurrentFrags) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
-
-	-- TotalFrags / AllTime
-		INSERT INTO StatsServerFrags (Date, Span, ServerId, PlayerId, Frags, Position )
-		SELECT t.*, @rownum:=@rownum+1 FROM
-			(SELECT			p_date,
-						'AllTime' as Span,
-						p_serverId,
-						ps.PlayerId,
-						sum(FragCount) + sum(CurrentFrags)
-			FROM 			PlayerSession as ps
-			INNER JOIN		GameServer as gs
-				ON		gs.ServerId = ps.ServerId
-			WHERE			ps.SessionStart <= p_date
-			AND			gs.ServerId = p_serverId
-			GROUP BY		ps.PlayerId
-			ORDER BY		sum(FragCount) + sum(CurrentFrags) DESC
-			LIMIT			10) as t, (SELECT @rownum:=0) as r;
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
 
 END //
 DELIMITER ;
 
 
 
-DROP PROCEDURE IF EXISTS spServerStats;
+DROP PROCEDURE IF EXISTS spPlayerAliasLookup;
 
 DELIMITER //
 
-CREATE PROCEDURE spServerStats (
+CREATE PROCEDURE spPlayerAliasLookup (
+	IN p_playerId TEXT,
+	IN p_pageRecordCount INTEGER,
+	IN p_pageRecordOffset INTEGER)
+
+BEGIN
+	
+	DECLARE SQLs VARCHAR(10000);
+	
+	SET @SQLs = CONCAT('SELECT 	master_p.PlayerId,
+		slave_p.PlayerId as AliasPlayerId,
+		slave_p.AliasBytes,
+		slave_p.Alias,
+			(select TIMESTAMPDIFF(SECOND, ifnull(SessionEnd,UTC_TIMESTAMP), UTC_TIMESTAMP())
+			FROM PlayerSession
+			where PlayerId = slave_p.PlayerId order by SessionStart desc limit 1) as LastSeenAgo
+		
+FROM 		Player as master_p
+INNER JOIN 	Player as slave_p
+		ON (INSTR(slave_p.IPAddress, ''.'') > 0 
+			AND master_p.IPAddress like CONCAT(LEFT(slave_p.IPAddress,LENGTH(slave_p.IPAddress) - INSTR(REVERSE(slave_p.IPAddress),''.'')), ''%''))
+WHERE INSTR(master_p.IPAddress,''.'') > 0
+AND		master_p.PlayerId = ', p_playerId, '
+ORDER BY (select TIMESTAMPDIFF(SECOND, ifnull(SessionEnd,UTC_TIMESTAMP), UTC_TIMESTAMP())
+			FROM PlayerSession
+			where PlayerId = slave_p.PlayerId order by SessionStart desc limit 1) 
+	LIMIT ', p_pageRecordCount, ' OFFSET ', p_pageRecordOffset, ';');
+	
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
+	
+END //
+DELIMITER ;
+
+
+DROP PROCEDURE IF EXISTS spServerMatches;
+
+DELIMITER //
+CREATE PROCEDURE spServerMatches (
+IN p_serverId INTEGER,
+IN p_pageRecordCount INTEGER,
+IN p_pageRecordOffset INTEGER)
+BEGIN
+	DECLARE SQLs VARCHAR(10000);
+	
+	SET @SQLs = CONCAT('SELECT
+	sm.ServerMatchId as MatchId,
+	DATE_FORMAT(sm.MatchStart, ''%Y-%m-%dT%TZ'') as MatchStart,
+	GameServer.GameId as GameId,
+	GameServer.DNS as HostName,
+	GameServer.Port As Port,
+	ServerData.Name as ServerName,
+	GameServer.ServerId as ServerId,
+	sm.Map as Map,
+	GameServer.ModificationCode as Modification,
+	(SELECT Count(PlayerMatch.AliasId) FROM PlayerMatch WHERE sm.ServerMatchId = PlayerMatch.ServerMatchId) AS PlayerCount,
+	TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) as MatchDuration
+	FROM ServerMatch as sm
+	inner join GameServer on (sm.ServerId = GameServer.ServerId)
+	inner join ServerData on (sm.ServerId = ServerData.ServerId)
+	WHERE GameServer.ServerId = ',p_serverId, '
+	AND EXISTS (SELECT * FROM PlayerMatch as pm1 WHERE pm1.ServerMatchId = sm.ServerMatchId AND pm1.Frags > 0)
+	AND TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) > 10
+	ORDER BY UNIX_TIMESTAMP(sm.MatchStart) DESC
+	LIMIT ', p_pageRecordCount, ' OFFSET ', p_pageRecordOffset, ';');
+	
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
+END //
+DELIMITER ;
+
+
+DROP PROCEDURE IF EXISTS spServerMatchesCount;
+
+DELIMITER //
+CREATE PROCEDURE spServerMatchesCount (
+IN p_serverId INTEGER)
+BEGIN
+	DECLARE SQLs VARCHAR(10000);
+	
+	SET @SQLs = CONCAT('SELECT Count(*) as RecordCount
+	FROM ServerMatch as sm
+	inner join GameServer on (sm.ServerId = GameServer.ServerId)
+	inner join ServerData on (sm.ServerId = ServerData.ServerId)
+	WHERE EXISTS (SELECT * FROM PlayerMatch as pm1 WHERE pm1.ServerMatchId = sm.ServerMatchId AND pm1.Frags > 0)
+	AND GameServer.ServerId = ',p_serverId, '
+	AND TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) > 10;');
+	
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
+END //
+DELIMITER ;
+
+
+DROP PROCEDURE IF EXISTS spServerPlayerWeeklyRanking;
+
+DELIMITER //
+
+CREATE PROCEDURE spServerPlayerWeeklyRanking (
 	IN p_date DATETIME,
 	IN p_serverId INTEGER)
 
 BEGIN
 	
-	SET @varDate = p_Date;
+	SELECT sub.*, p.AliasBytes,
+		(SELECT sm1.ServerMatchId 
+		from 	PlayerMatch  as pm1
+		INNER JOIN	ServerMatch as sm1 ON (pm1.ServerMatchId = sm1.ServerMatchId)
+		where 	sub.PlayerId = pm1.PlayerId 		
+		AND 	sm1.ServerId = p_serverId
+		AND 	round(pm1.Frags/( TIMESTAMPDIFF(SECOND, pm1.PlayerMatchStart, ifnull(pm1.PlayerMatchEnd,UTC_TIMESTAMP)) / 60),2) = sub.FPM
+		AND		TIMESTAMPDIFF(SECOND, pm1.PlayerMatchStart,ifnull(pm1.PlayerMatchEnd,UTC_TIMESTAMP)) BETWEEN 180 AND 7800
+		AND			CONVERT_TZ(sm1.MatchStart, 'UTC', 'EST') BETWEEN
+						Date_Add(p_date,INTERVAL -(DayOfWeek(p_date)-1 ) DAY) 
+						AND Date_Add(p_date,INTERVAL (7-(DayOfWeek(p_date)-1 )) DAY)
+		LIMIT 1) as MatchId
+	FROM 
+		(SELECT PlayerId,
+			MAX(round(pm.Frags/( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(pm.PlayerMatchEnd,UTC_TIMESTAMP)) / 60),2)) as FPM
+		FROM PlayerMatch as pm
+		INNER JOIN	ServerMatch as sm ON (pm.ServerMatchId = sm.ServerMatchId)
+		WHERE		TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart,ifnull(pm.PlayerMatchEnd,UTC_TIMESTAMP)) BETWEEN 180 AND 7800
+		AND			pm.Frags > 0
+		AND			CONVERT_TZ(sm.MatchStart, 'UTC', 'EST') BETWEEN
+						Date_Add(p_date,INTERVAL -(DayOfWeek(p_date)-1 ) DAY) 
+						AND Date_Add(p_date,INTERVAL (7-(DayOfWeek(p_date)-1 )) DAY)
+		AND 		sm.ServerId = p_serverId
+		GROUP BY 	pm.PlayerId) as sub
+	INNER JOIN	Player as p ON (sub.PlayerId = p.PlayerId)
+	ORDER BY sub.FPM DESC
+	LIMIT 100;
 	
-	IF @varDate = '0000-00-00 00:00:00' THEN
-		SELECT DATE INTO @varDate FROM StatsServerTimePlayed ORDER BY DATE DESC LIMIT 1;
-	END IF;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS spServerPlayerWeeklyPlayTime;
+
+DELIMITER //
+
+CREATE PROCEDURE spServerPlayerWeeklyPlayTime (
+	IN p_date DATETIME,
+	IN p_serverId INTEGER)
+
+BEGIN
+	SELECT		sub.*, p.AliasBytes
+	FROM
+		(SELECT 	pm.PlayerId,
+					SUM(TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart,ifnull(pm.PlayerMatchEnd,UTC_TIMESTAMP))) as TimeSpent
+		FROM 		PlayerMatch as pm
+		INNER JOIN	ServerMatch sm on (sm.ServerMatchId = pm.ServerMatchId)
+		WHERE 		sm.ServerId = p_serverId
+		AND			CONVERT_TZ(sm.MatchStart, 'UTC', 'EST') BETWEEN
+						Date_Add(p_date,INTERVAL -(DayOfWeek(p_date)-1 ) DAY) 
+						AND Date_Add(p_date,INTERVAL (7-(DayOfWeek(p_date)-1 )) DAY)
+		GROUP BY	pm.PlayerId) as sub
+	INNER JOIN	Player as p ON (sub.PlayerId = p.PlayerId)
+	WHERE		sub.TimeSpent > 0
+	ORDER BY 	sub.TimeSpent DESC
+	LIMIT 100;
 	
-	SELECT	gs.Serverid,smfpm.Date as Date, smfpm.Span as Span, smfpm.Position as Position,
-			smfpm.FPM as MatchFPM, smfpm.ServerMatchId as MatchFPMMatchId, smfpm.PlayerId as MatchFPMPlayerId, smfpmp.Alias as MatchFPMAliasName, smfpmp.AliasBytes as MatchFPMAliasBytes,
-			smf.Frags as MatchFrags, smf.ServerMatchId as MatchFragsMatchId, smf.PlayerId as MatchFragsPlayerId, smfp.Alias as MatchFragsAliasName, smfp.AliasBytes as MatchFragsAliasBytes,
-			stp.TimePlayed as TimePlayed, stp.PlayerId as TimePlayedPlayerId, stpp.Alias as TimePlayedAliasName, stpp.AliasBytes as TimePlayedAliasBytes,
-			sf.Frags as Frags, sf.PlayerId as FragsPlayerId, sfp.Alias as FragsAliasName, sfp.AliasBytes as FragsAliasBytes
+END //
+DELIMITER ;
 
-	FROM		GameServer as gs
+DROP PROCEDURE IF EXISTS spServerStatsMapPercentage;
 
-	INNER JOIN	StatsServerMatchFPM as smfpm
-		ON	smfpm.ServerId = gs.ServerId
-		AND	smfpm.Date = @varDate
+DELIMITER //
 
-	INNER JOIN 	Player as smfpmp
-		ON	smfpmp.PlayerId = smfpm.PlayerId	
+CREATE PROCEDURE spServerStatsMapPercentage (
+	IN p_date DATETIME,
+	IN p_serverId INTEGER)
+BEGIN
 
-	INNER JOIN	StatsServerMatchFrags as smf
-		ON	smf.ServerId = gs.ServerId
-		AND	smf.Span = smfpm.span
-		AND	smf.Position = smfpm.Position
-		AND	smf.Date = smfpm.Date
-		AND	smf.ServerId = gs.ServerId
-
-	INNER JOIN 	Player as smfp
-		ON	smfp.PlayerId = smf.PlayerId
-
-	INNER JOIN	StatsServerTimePlayed as stp
-		ON	stp.ServerId = gs.ServerId
-		AND	stp.Span = smfpm.span
-		AND	stp.Position = smfpm.Position
-		AND	stp.Date = smfpm.Date
-		AND	stp.ServerId = gs.ServerId
-
-	INNER JOIN 	Player as stpp
-		ON	stpp.PlayerId = stp.PlayerId
-
-	INNER JOIN	StatsServerFrags as sf
-		ON	sf.ServerId = gs.ServerId
-		AND	sf.Span = smfpm.span
-		AND	sf.Position = smfpm.Position
-		AND	sf.Date = smfpm.Date
-		AND	sf.ServerId = gs.ServerId
-
-	INNER JOIN 	Player as sfp
-		ON	sfp.PlayerId = sf.PlayerId	
-
-	WHERE		gs.ServerId = p_serverId;
-
+	DECLARE Total INTEGER;
+	SET @Total = 
+		(SELECT  SUM(TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd, UTC_TIMESTAMP))) 
+		FROM		ServerMatch as sm
+		WHERE		CONVERT_TZ(sm.MatchStart, 'UTC', 'EST') BETWEEN
+					Date_Add(p_date,INTERVAL -30 DAY) 
+					AND p_date
+		AND 		sm.ServerId = p_serverId
+		AND EXISTS (SELECT * FROM PlayerMatch as pm WHERE pm.ServerMatchId = sm.ServerMatchId AND pm.Frags > 0));
+					
+	SELECT   
+			sub.Map as Map, 
+			round(100*(TimeSpent/@Total),2) as Percentage
+	FROM
+		(SELECT 
+			sm.Map, SUM(TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd, UTC_TIMESTAMP))) as TimeSpent
+		FROM		ServerMatch as sm
+		WHERE		CONVERT_TZ(sm.MatchStart, 'UTC', 'EST') BETWEEN
+					Date_Add(p_date,INTERVAL -30 DAY) 
+					AND p_date
+		AND 		sm.ServerId = p_serverId
+		AND EXISTS (SELECT * FROM PlayerMatch as pm WHERE pm.ServerMatchId = sm.ServerMatchId AND pm.Frags > 0)
+		GROUP BY sm.Map) as sub
+	ORDER BY sub.TimeSpent DESC
+	LIMIT 10;
+	
 END//
 
 DELIMITER ;
 
+
+
+DROP PROCEDURE IF EXISTS spServerRecentMatches;
+
+DELIMITER //
+
+CREATE PROCEDURE spServerRecentMatches (
+	IN p_gameId INTEGER)
+
+BEGIN
+	
+	SELECT		sm.ServerMatchId,
+				gs.ServerId,
+				gs.DNS as HostName,
+				gs.Port as Port,
+				gs.GameId,
+				TIMESTAMPDIFF(SECOND, ifnull(sm.MatchEnd, UTC_TIMESTAMP), UTC_TIMESTAMP()) as MatchEndAgo,
+				TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) as Duration,
+				sm.Map as Map,
+				gs.ModificationCode as Modification,
+				(SELECT Count(pm.AliasId) FROM PlayerMatch as pm WHERE sm.ServerMatchId = pm.ServerMatchId) AS PlayerCount
+	FROM		ServerMatch as sm
+	INNER JOIN 	GameServer as gs on (sm.ServerId = gs.ServerId)
+	WHERE		EXISTS (SELECT * FROM PlayerMatch as pm WHERE pm.Frags > 0 AND pm.ServerMatchId = sm.ServerMatchId)
+	AND			TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) > 60
+	AND			sm.MatchStart > Date_Add(Current_Date(),INTERVAL -30 DAY) 
+	AND			(gs.GameId = p_gameId OR p_gameId = -1)
+	ORDER BY 	sm.MatchEnd DESC
+	LIMIT 10;
+	
+END //
+DELIMITER ;
+
+
+
+DROP TABLE IF EXISTS WeeklyStats;
+CREATE TABLE WeeklyStats (
+	WeeklyStatsId INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
+	Date DATETIME NULL,
+	ServerId INTEGER NULL,
+	PlayerId INTEGER NULL,
+	ServerMatchId INTEGER NULL,
+	Position INTEGER NULL,
+	StatValue FLOAT NULL,
+	StatType VARCHAR(21)  NULL	
+);
+
+DROP PROCEDURE IF EXISTS spProcessWeeklyServerStats;
+
+DELIMITER //
+
+CREATE PROCEDURE spProcessWeeklyServerStats (
+	IN p_date DATETIME,
+	IN p_serverId INTEGER)
+
+BEGIN
+	DELETE FROM WeeklyStats WHERE Date = p_date AND ServerId = p_serverId;
+
+	
+	-- WEEKLY FPM Leaders
+	
+	INSERT INTO WeeklyStats (Date, ServerId, ServerMatchId,  PlayerId,  StatValue, StatType, Position)
+	SELECT p_date,p_serverId,t.*, 'FPM', @rownum:=@rownum+1 FROM
+		(
+		SELECT 
+			(SELECT sm1.ServerMatchId 
+			from 	PlayerMatch  as pm1
+			INNER JOIN	ServerMatch as sm1 ON (pm1.ServerMatchId = sm1.ServerMatchId)
+			where 	sub.PlayerId = pm1.PlayerId 		
+			AND 	sm1.ServerId = p_serverId
+			AND 	round(pm1.Frags/( TIMESTAMPDIFF(SECOND, pm1.PlayerMatchStart, ifnull(pm1.PlayerMatchEnd,UTC_TIMESTAMP)) / 60),2) = sub.FPM
+			AND		TIMESTAMPDIFF(SECOND, pm1.PlayerMatchStart,ifnull(pm1.PlayerMatchEnd,UTC_TIMESTAMP)) BETWEEN 180 AND 7800
+			AND		CONVERT_TZ(pm1.PlayerMatchStart, 'UTC', 'EST') > Date_Add(Current_Date(),INTERVAL -(DayOfWeek(Current_Date())-1 ) DAY)	
+			LIMIT 1) as ServerMatchId,
+			sub.*
+		FROM 
+			(SELECT PlayerId,
+				MAX(round(pm.Frags/( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(pm.PlayerMatchEnd,UTC_TIMESTAMP)) / 60),2)) as FPM
+			FROM PlayerMatch as pm
+			INNER JOIN	ServerMatch as sm ON (pm.ServerMatchId = sm.ServerMatchId)
+			WHERE		TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart,ifnull(pm.PlayerMatchEnd,UTC_TIMESTAMP)) BETWEEN 180 AND 7800
+			AND			CONVERT_TZ(pm.PlayerMatchStart, 'UTC', 'EST') BETWEEN
+				Date_Add(p_date,INTERVAL -(DayOfWeek(p_date)-1 ) DAY) 
+				AND Date_Add(p_date,INTERVAL (7-(DayOfWeek(p_date)-1 )) DAY)
+			AND			pm.Frags > 0
+			AND 		sm.ServerId = p_serverId
+			GROUP BY 	pm.PlayerId) as sub
+		INNER JOIN	Player as p ON (sub.PlayerId = p.PlayerId)
+		ORDER BY sub.FPM DESC
+		LIMIT 100) as t, (SELECT @rownum:=0) as r;
+		
+	-- WEEKLY LongestTimePlayed Leaders
+	
+	INSERT INTO WeeklyStats (Date, ServerId, ServerMatchId,  PlayerId,  StatValue, StatType, Position)
+	SELECT p_date,p_serverId, NULL, t.*, 'TimePlayed', @rownum:=@rownum+1 FROM
+		(SELECT PlayerId, TimePlayed
+		FROM
+			(SELECT PlayerId,
+				SUM(round( TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(pm.PlayerMatchEnd,UTC_TIMESTAMP)) ,2)) as TimePlayed
+			FROM PlayerMatch as pm
+			INNER JOIN	ServerMatch as sm ON (pm.ServerMatchId = sm.ServerMatchId)
+			WHERE		TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart,ifnull(pm.PlayerMatchEnd,UTC_TIMESTAMP)) BETWEEN 180 AND 7800
+			AND			CONVERT_TZ(pm.PlayerMatchStart, 'UTC', 'EST') BETWEEN
+				Date_Add(p_date,INTERVAL -(DayOfWeek(p_date)-1 ) DAY) 
+				AND Date_Add(p_date,INTERVAL (7-(DayOfWeek(p_date)-1 )) DAY)
+			AND			pm.Frags > 0
+			AND 		sm.ServerId = p_serverId
+			GROUP BY 	pm.PlayerId) as sub
+		ORDER BY sub.TimePlayed DESC
+		LIMIT 100) as t, (SELECT @rownum:=0) as r;
+
+	
+END//
+
+DELIMITER ;

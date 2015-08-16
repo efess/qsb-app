@@ -97,8 +97,7 @@ namespace QSB.Server
                         // Ghost not found, add new Activity
                         PlayerActivity newPlayer = new PlayerActivity(
                             playerSnapShot,
-                            dbPlayer
-                            );
+                            dbPlayer);
 
                         // If two or more players are in this game, start a match for this player.
                         if (pSnapshot.Players.Count > 1)

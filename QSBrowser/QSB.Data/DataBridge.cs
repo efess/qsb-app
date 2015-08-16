@@ -55,15 +55,15 @@ namespace QSB.Data
                     break;
 
                 case DatabaseEngine.MySql:
-                    _sessionFactory = Fluently.Configure()
-                    .ExposeConfiguration(c => c.Properties.Add("hbm2ddl.keywords", "none"))
-                    .Database(
-                        MySQLConfiguration.Standard.ConnectionString(pConnectionString)
-                    )
-                    .Mappings(m =>
-                        m.FluentMappings.AddFromAssemblyOf<DataBridge>())
-                    .BuildSessionFactory();
-                    
+                        _sessionFactory = Fluently.Configure()
+                        .ExposeConfiguration(c => c.Properties.Add("hbm2ddl.keywords", "none"))
+                        .Database(
+                            MySQLConfiguration.Standard.ConnectionString(pConnectionString)
+                        )
+                        .Mappings(m =>
+                            m.FluentMappings.AddFromAssemblyOf<DataBridge>())
+                        .BuildSessionFactory();
+              
                     break;
             }
 

@@ -66,7 +66,10 @@ namespace QSB.Server
             else
                 _Cache.Add(pServerId, pSnapshot);
         }
-
+        public void Clear()
+        {
+            _Cache.Clear();
+        }
         public ServerActivity this[int pServerId]
         {
             get

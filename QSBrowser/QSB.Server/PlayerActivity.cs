@@ -32,6 +32,9 @@ namespace QSB.Server
     /// </summary>
     public class PlayerActivity : IEquatable<PlayerActivity>
     {
+        // Number of frags accumulated while this session is alive
+        private int _recordedFrags = 0;
+
         // Record total number of frags while player is active
         private int _TotalFrags;
         
@@ -70,7 +73,6 @@ namespace QSB.Server
 
         internal PlayerActivity(PlayerSnapshot pPlayerSnapshot, Player pDbPlayer)
         {
-
             PlayerSnap = pPlayerSnapshot;
 
             Session = new PlayerSession();
@@ -84,6 +86,25 @@ namespace QSB.Server
             
             StartTime = DateTime.UtcNow;
             _TotalFrags = 0;
+        }
+
+        public IEnumerable<string> follow(string fileName)
+        {
+            var stream = new System.IO.StreamReader(fileName);
+            stream.BaseStream.Seek(0, System.IO.SeekOrigin.End);
+            while (true)
+            {
+                string newLine = null;
+                if ((newLine = stream.ReadLine()) != null)
+                {
+                    yield return newLine;
+                }
+                else
+                {
+                    System.Threading.Thread.Sleep(10); // sleep 10 ms
+                }
+
+            }
         }
 
         public int TotalFrags
@@ -127,7 +148,7 @@ namespace QSB.Server
                 IsScoreReset = true;
 
                 // PlayerSnap is still previous snapshot
-                CurrentMatch.Frags = PlayerSnap.Frags;
+                //CurrentMatch.Frags = PlayerSnap.Frags;
                 CurrentMatch.PlayerMatchEnd = DateTime.UtcNow;
 
                 _TotalFrags += PlayerSnap.Frags;
@@ -150,7 +171,27 @@ namespace QSB.Server
                 // Don't update Current Match if score is resetting, it needs to save first
                 if (!IsScoreReset)
                 {
-                    CurrentMatch.Frags = (pNewPlayerSnapshot.Frags > CurrentMatch.Frags ? pNewPlayerSnapshot.Frags : CurrentMatch.Frags);
+                    // this should just be frag accumulation...
+                    // old way for reference: 
+                    // CurrentMatch.Frags = (pNewPlayerSnapshot.Frags > CurrentMatch.Frags ? pNewPlayerSnapshot.Frags : CurrentMatch.Frags);
+                   
+                    if (pNewPlayerSnapshot.Frags > -99)
+                    {
+                        int accum = 0;
+                        if (PlayerSnap.Frags <= -99)
+                        {
+                            // Joining game from observer
+                            accum = pNewPlayerSnapshot.Frags;
+                        }
+                        else
+                        {
+                            // typical case.
+                            accum = pNewPlayerSnapshot.Frags - PlayerSnap.Frags;
+                        }
+                        if (accum > 0)
+                            CurrentMatch.Frags += accum;
+                    }
+
                     if (pNewPlayerSnapshot is NetQuakePlayer)
                     {
                         NetQuakePlayer netQuakePlayer = pNewPlayerSnapshot as NetQuakePlayer;

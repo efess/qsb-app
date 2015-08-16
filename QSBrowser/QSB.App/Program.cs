@@ -212,12 +212,12 @@ namespace QSB.App
                 , new QSB.Common.TaskScheduling.TimeOfDaySchedule(new TimeSpan(0, 1, 0)));
             programDispatcher.AddTask(scheduledTask);
 
-            scheduledTask = new ScheduledTask(
-                serverManager
-                , new QSB.Common.TaskScheduling.Task(serverManager.SavePreviousDaysServerStats)
-                , "ProcessServerStatistics"
-                , new QSB.Common.TaskScheduling.TimeOfDaySchedule(new TimeSpan(0, 1, 0)));
-            programDispatcher.AddTask(scheduledTask);
+            //scheduledTask = new ScheduledTask(
+            //    serverManager
+            //    , new QSB.Common.TaskScheduling.Task(serverManager.SavePreviousDaysServerStats)
+            //    , "ProcessServerStatistics"
+            //    , new QSB.Common.TaskScheduling.TimeOfDaySchedule(new TimeSpan(0, 1, 0)));
+            //programDispatcher.AddTask(scheduledTask);
 
             WriteMessage("Starting task dispatcher");
 
