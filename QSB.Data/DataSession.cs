@@ -18,14 +18,10 @@ along with QSBrowser.  If not, see <http://www.gnu.org/licenses/>.
  */
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using NHibernate;
-using FluentNHibernate.Cfg.Db;
-using FluentNHibernate.Cfg;
-using QSB.Data.TableObject;
-using QSB.Common;
 using NHibernate.Criterion;
+using QSB.Common;
+using QSB.Data.TableObject;
 using QSB.Data.ViewObject;
 
 namespace QSB.Data
@@ -428,10 +424,7 @@ namespace QSB.Data
         public virtual int NextPlayerId()
         {
             IQuery query = _DbSession.CreateSQLQuery("SELECT ifnull(MAX(PlayerId),0) FROM Player");
-            object obj = query.UniqueResult();
-            if (obj is Int64)
-                return Convert.ToInt32(obj) + 1;
-            else throw new InvalidCastException("Cannot convert object to int");
+            return query.UniqueResult<int>();
         }
 
         public virtual void FlushData()

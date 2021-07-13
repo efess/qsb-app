@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
@@ -10,20 +10,21 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>QSB.App</RootNamespace>
     <AssemblyName>QSBApp</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <TargetFrameworkProfile>
     </TargetFrameworkProfile>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
-    <PlatformTarget>x86</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
+    <WarningLevel>0</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
     <PlatformTarget>x86</PlatformTarget>
@@ -33,6 +34,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -48,28 +50,28 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\QSB.Common\QSB.Common.csproj">
-      <Project>{95743B83-561F-42F9-BF3C-7B8969100AE2}</Project>
-      <Name>QSB.Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\QSB.Data\QSB.Data.csproj">
-      <Project>{1C7DB4E5-6C9B-44D8-90B3-88A71005BA12}</Project>
-      <Name>QSB.Data</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\QSB.GameServerInterface\QSB.GameServerInterface.csproj">
-      <Project>{17834DB6-27D3-4F55-879E-F1029B91EB20}</Project>
-      <Name>QSB.GameServerInterface</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\QSB.Server\QSB.Server.csproj">
-      <Project>{2489E2F4-281B-4C01-B9F7-B60D8DAFD467}</Project>
-      <Name>QSB.Server</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="..\QSB.Server\QSB.Server.licenseheader">
       <Link>QSB.Server.licenseheader</Link>
     </None>
     <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QSB.Common\QSB.Common.csproj">
+      <Project>{95743b83-561f-42f9-bf3c-7b8969100ae2}</Project>
+      <Name>QSB.Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\QSB.Data\QSB.Data.csproj">
+      <Project>{1c7db4e5-6c9b-44d8-90b3-88a71005ba12}</Project>
+      <Name>QSB.Data</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\QSB.GameServerInterface\QSB.GameServerInterface.csproj">
+      <Project>{17834db6-27d3-4f55-879e-f1029b91eb20}</Project>
+      <Name>QSB.GameServerInterface</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\QSB.Server\QSB.Server.csproj">
+      <Project>{2489e2f4-281b-4c01-b9f7-b60d8dafd467}</Project>
+      <Name>QSB.Server</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

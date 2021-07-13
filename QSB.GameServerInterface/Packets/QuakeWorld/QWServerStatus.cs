@@ -59,7 +59,6 @@ namespace QSB.GameServerInterface.Packets.QuakeWorld
 
                 QWPlayerStatus playerStatus = new QWPlayerStatus();
                 int colNum = 0;
-                byte[] tempByte;
                 int playerOffset = byteCounter;
 
                 while (playerOffset < tempOffset)

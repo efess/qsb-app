@@ -32,9 +32,6 @@ namespace QSB.Server
     /// </summary>
     public class PlayerActivity : IEquatable<PlayerActivity>
     {
-        // Number of frags accumulated while this session is alive
-        private int _recordedFrags = 0;
-
         // Record total number of frags while player is active
         private int _TotalFrags;
         
