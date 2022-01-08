@@ -48,7 +48,7 @@ namespace QSB.Data
         GameServer GetServerByIPAddress(string IPAddress, int pPort);
         void AddUpdateServer(GameServer pServer);
         void AddPlayerMatch(PlayerMatch pPlayerMatch);
-        void AddServerMatch(ServerMatch pServerMatch);
+        void AddUpdateServerMatch(ServerMatch pServerMatch);
         void AddUpdatePlayerSession(PlayerSession pPlayer);
         void AddUpdateServerDataObject(ServerData pServerDataObject);
         Player GetOrCreatePlayer(string pAlias, string pIpAddress, byte[] pAliasBytes, int pGameId);

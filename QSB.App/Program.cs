@@ -34,7 +34,7 @@ namespace QSB.App
         static ScheduleDispatcher programDispatcher;
 
         static void Main(string[] args)
-        {            
+        {
             string connectionString = Environment.GetEnvironmentVariable("DB_CONN_STRING") ??
                 ConfigurationSettings.AppSettings["ConnectionString"] as string;
             string stringDatabaseEngine = Environment.GetEnvironmentVariable("DB_ENGINE") ??

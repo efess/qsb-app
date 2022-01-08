@@ -19,6 +19,7 @@ along with QSBrowser.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 using QSB.Data;
 using QSB.GameServerInterface;
 using QSB.Data.TableObject;
@@ -43,6 +44,14 @@ namespace QSB.Server
             int playerResetCount = 0;
             List<Player> activeDbPlayers = new List<Player>();
 
+            // If there are now players here, start a new match
+            if (pSnapshot.Players.Where(player => player.Frags != -99).Count() > 1
+                && pActivity.CurrentMatch == null)
+            {
+                pActivity.NewMatch();
+                _dataSession.AddUpdateServerMatch(pActivity.CurrentMatch);
+            }
+
             foreach (PlayerSnapshot playerSnapShot in pSnapshot.Players)
             {
                 // Get player from database. DB Layer determines PlayerId (used for Comparisons)
@@ -55,11 +64,6 @@ namespace QSB.Server
                 playerSnapShot.PlayerId = dbPlayer.PlayerId;
 
                 activeDbPlayers.Add(dbPlayer);
-                
-                // If there are now players here, start a new match
-                if (pSnapshot.Players.Count > 1
-                    && pActivity.MatchStart == null)
-                    pActivity.NewMatch();
                 
                 // Find player currently in game. If this occurs more than once, duplicate player in game exists.
                 PlayerActivity activePlayer = pActivity.FindActivity(dbPlayer.PlayerId);
@@ -109,20 +113,19 @@ namespace QSB.Server
             }
 
             // Probably game/match change here
-            if (pActivity.MatchStart.HasValue &&
+            if (pActivity.CurrentMatch != null &&
                 (playerResetCount > 1
                 || pActivity.ServerSnapshot.Mod != pSnapshot.Mod
                 || pActivity.ServerSnapshot.CurrentMap != pSnapshot.CurrentMap
                 || pSnapshot.Players.Count < 2))
             {
                 // Create a ServerMatch record
-                ServerMatch serverMatch = new ServerMatch();
+                ServerMatch serverMatch = pActivity.CurrentMatch;
                 serverMatch.Modification = pActivity.ServerSnapshot.Mod;
                 serverMatch.Map = pActivity.ServerSnapshot.CurrentMap;
-                serverMatch.MatchStart = pActivity.MatchStart.Value;
                 serverMatch.ServerId = _gameServer.ServerId;
                 serverMatch.MatchEnd = DateTime.UtcNow;
-                _dataSession.AddServerMatch(serverMatch);
+                _dataSession.AddUpdateServerMatch(serverMatch);
 
 
                 foreach (PlayerActivity playerActivity in pActivity.PlayerActivities)
@@ -139,7 +142,10 @@ namespace QSB.Server
                 
                 // Reset match information
                 if (pSnapshot.Players.Count > 1)
+                {
                     pActivity.NewMatch();
+                    _dataSession.AddUpdateServerMatch(pActivity.CurrentMatch);
+                }
                 else
                     pActivity.NoMatches();
             }
@@ -315,9 +321,11 @@ namespace QSB.Server
                 session.SessionEnd = DateTime.UtcNow;
                 _dataSession.AddUpdatePlayerSession(session);
             }
-
-            if (pSnapshot.Players.Count > 1)
+            if (pSnapshot.Players.Where(player => player.Frags != -99).Count() > 1)
+            {
                 serverActivity.NewMatch();
+                _dataSession.AddUpdateServerMatch(serverActivity.CurrentMatch);
+            }
 
             ServerCache.Cache.AddSnapshot(_gameServer.ServerId, serverActivity);
             return serverActivity;

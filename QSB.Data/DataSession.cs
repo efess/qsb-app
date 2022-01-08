@@ -270,7 +270,7 @@ namespace QSB.Data
                 CommitTransaction();
         }
 
-        public virtual void AddServerMatch(ServerMatch pServerMatch)
+        public virtual void AddUpdateServerMatch(ServerMatch pServerMatch)
         {
 
             bool wasInTransaction = true;

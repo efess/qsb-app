@@ -21,6 +21,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Xml;
+using Newtonsoft.Json;
 using QSB.Common;
 
 namespace QSB.GameServerInterface
@@ -85,23 +86,11 @@ namespace QSB.GameServerInterface
         /// <summary>
         /// Server settings in Setting/Value XML string
         /// </summary>
-        public string ServerSettingsXml
+        public string ServerSettingsJson
         {
             get
             {
-                XmlDocument xd = new XmlDocument();
-
-                XmlNode rootNode = xd.AppendChild(XmlHelper.GetElementNode(xd, "Settings", string.Empty)); 
-
-                foreach(ServerSetting setting in ServerSettings)
-                {
-                    XmlNode settingNode = rootNode.AppendChild(XmlHelper.GetElementNode(xd, "Setting",""));
-
-                    settingNode.AppendChild(XmlHelper.GetElementNode(xd,"Setting",setting.Setting));
-                    settingNode.AppendChild(XmlHelper.GetElementNode(xd,"Value", setting.Value));
-                }
-
-                return xd.OuterXml;
+                return JsonConvert.SerializeObject(ServerSettings);
             }
         }
     }

@@ -61,6 +61,12 @@ namespace QSB.GameServerInterface
                 case Game.Quake3:
                     infoProvider = new QSB.GameServerInterface.Games.Quake3.Quake3();
                     break;
+                case Game.QuakeEnhanced:
+                    {
+                        var psk = Environment.GetEnvironmentVariable("QE_PSK");
+                        infoProvider = new QSB.GameServerInterface.Games.QuakeEnhanced.QuakeEnhanced(psk);
+                    }
+                    break;
                 default:
                     throw new NotSupportedException("Game is not supported at this time");
 

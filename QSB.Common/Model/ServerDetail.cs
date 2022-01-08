@@ -16,11 +16,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with QSBrowser.  If not, see <http://www.gnu.org/licenses/>.
  */
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Xml.Linq;
 
 namespace QSB.Common.Model
 {
@@ -145,18 +143,16 @@ namespace QSB.Common.Model
             CustomModificationName = pCustomModificationName;
 	    }
 
-        private List<PlayerDetail> ProcessPlayerData(string pPlayerXml)
+        private List<PlayerDetail> ProcessPlayerData(string playerJson)
         {
             var playerDetails = new List<PlayerDetail>();
 
-            if (!string.IsNullOrEmpty(pPlayerXml))
+            if (!string.IsNullOrEmpty(playerJson))
             {
-                var xEPlayers = XElement.Parse(pPlayerXml);
-
-                foreach (XElement xEPlayer in xEPlayers.Elements())
+                try
                 {
-                    playerDetails.Add(new PlayerDetail(xEPlayer));
-                }
+                    playerDetails = JsonConvert.DeserializeObject<List<PlayerDetail>>(playerJson);
+                } catch { }
             }
 
             return playerDetails;

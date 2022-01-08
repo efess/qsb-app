@@ -21,15 +21,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace QSB.Data.TableObject
+namespace QSB.GameServerInterface.Games.QuakeEnhanced
 {
-    public class ServerMatch
+    public class QuakeEnhancedPlayer : PlayerSnapshot
     {
-        public virtual int ServerMatchId { get; set; }
-        public virtual string Modification { get; set; }
-        public virtual string Map { get; set; }
-        public virtual DateTime MatchStart { get; set; }
-        public virtual DateTime? MatchEnd { get; set; }
-        public virtual int ServerId { get; set; }
+        // Netquake only properties
+        public int ShirtColor { get; internal set; }
+        public int PantColor { get; internal set; }
+
+        public QuakeEnhancedPlayer(byte[] pPlayerBytes, string pIpAddress, string pPlayerName, int pPlayerNumber)
+            : base(pPlayerBytes, pIpAddress, pPlayerName, pPlayerNumber)
+        {
+        }
     }
 }

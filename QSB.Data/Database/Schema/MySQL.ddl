@@ -26,8 +26,8 @@ Active BOOL,
 CustomModificationName VARCHAR(50)
 );
 
-CREATE INDEX IDX_GAMESERVER_ ON GameServer(
-ServerId  ASC,
+CREATE INDEX  ON GameServer(
+ServerId  ASC,IDX_GAMESERVER_
 GameId ASC,	
 Region  ASC
 );
@@ -772,11 +772,22 @@ sd.ServerDataId as ServerDataId
 ,sd.Timestamp as Timestamp
 ,sd.MaxPlayers as MaxPlayers
 ,sd.IpAddress as IpAddress
-,(SELECT MatchStart from ServerMatch WHERE ServerId = sd.ServerId ORDER BY MatchStart DESC LIMIT 1) as RecentActivity
+,sm.MatchStart as RecentMatchStart
+,sm.MatchEnd as RecentMatchEnd
+,sm.Map as RecentMatchMap
+,sm.ServerMatchId as RecenMatchId
+,(SELECT count(*) from PlayerMatch where ServerMatchId = sm.ServerMatchId) as RecentMatchPlayers
+
 from
 GameServer gs
-inner join ServerData  sd
-ON gs.ServerId = sd.ServerId;
+inner join ServerData sd
+  ON gs.ServerId = sd.ServerId
+inner join ServerMatch sm
+  ON sm.ServerMatchId = (SELECT  ServerMatchId 
+                        from ServerMatch 
+                        WHERE ServerId = sd.ServerId 
+                        ORDER BY MatchStart 
+                        DESC LIMIT 1);
 
 
 DROP PROCEDURE IF EXISTS spAddUpdateGameServer;

@@ -46,7 +46,8 @@ namespace QSB.Common
         QuakeWorld,
         Quake2,
         Quake3,
-        Quake4
+        Quake4,
+        QuakeEnhanced
     }
 
 

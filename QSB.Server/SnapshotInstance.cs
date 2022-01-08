@@ -26,6 +26,7 @@ using QSB.Common;
 using System.Xml.Linq;
 using System.Xml;
 using System.IO;
+using Newtonsoft.Json;
 
 namespace QSB.Server
 {
@@ -45,15 +46,54 @@ namespace QSB.Server
             serverData.Modification = _activity.ServerSnapshot.Mod;
             serverData.TimeStamp = _activity.SnapshotTime;
             serverData.Name = _activity.ServerSnapshot.ServerName;
-            serverData.ServerSettings = _activity.ServerSnapshot.ServerSettingsXml.Trim();
+            serverData.ServerSettings = _activity.ServerSnapshot.ServerSettingsJson.Trim();
             serverData.IpAddress = _activity.ServerSnapshot.IpAddress.Trim();
             serverData.MaxPlayers = _activity.ServerSnapshot.MaxPlayerCount;
-            serverData.PlayerData = GetPlayerData((Game)_activity.DbGameServer.GameId);
+            serverData.PlayerData = GetPlayerJsonData((Game)_activity.DbGameServer.GameId);
 
             return serverData;
         }
 
-        private string GetPlayerData(Game pGame)
+        private string GetPlayerJsonData(Game pGame)
+        {
+            var players = _activity.ServerSnapshot.Players.Select(player =>
+            {
+                PlayerActivity activity = _activity.FindActivity(player.PlayerId);
+                TimeSpan uptime = DateTime.UtcNow - activity.StartTime;
+                var playerData = new PlayerData
+                {
+                    PlayerId = player.PlayerId,
+                    Name = player.PlayerName,
+                    NameBase64 = Convert.ToBase64String(player.PlayerNameBytes),
+                    UpTime = (int)uptime.TotalSeconds,
+                    JoinTime = (int)activity.StartTime.UnixTime(),
+                    CurrentFrags = player.Frags,
+                    TotalFrags = activity.TotalFrags,
+                    FragsPerMinute = uptime.TotalMinutes > 0
+                        ? Math.Round(activity.TotalFrags / ((Decimal)uptime.TotalMinutes), 2) 
+                        : 0
+                };
+
+                switch (pGame)
+                {
+                    case Game.NetQuake:
+                        playerData.Shirt = (player as
+                            QSB.GameServerInterface.Games.NetQuake.NetQuakePlayer).ShirtColor;
+                        playerData.Pant = (player as
+                            QSB.GameServerInterface.Games.NetQuake.NetQuakePlayer).PantColor;;
+                        break;
+                    default:
+                        playerData.Model = player.ModelName;
+                        playerData.Skin = player.SkinName;
+
+                        break;
+                }
+
+                return playerData;
+            });
+            return JsonConvert.SerializeObject(players);
+        }
+        private string GetPlayerXmlData(Game pGame)
         {
             var xEPlayers = new XElement("Players");
             

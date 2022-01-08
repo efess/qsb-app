@@ -45,8 +45,10 @@ namespace QSB.Server
         public List<PlayerActivity> PlayerActivities { get; private set; }
         public List<PlayerActivity> PlayerMatchGhosts { get; private set; }
 
-        public DateTime? MatchStart { get; internal set;}
-
+        /// <summary>
+        /// Current match
+        /// </summary>
+        public ServerMatch CurrentMatch { get; set; }
         /// <summary>
         /// Creates a new instance of ServerActivity provided current server snapshot and DatabaseSessions
         /// </summary>
@@ -68,7 +70,14 @@ namespace QSB.Server
 
         internal void NewMatch()
         {
-            MatchStart = DateTime.UtcNow;
+            CurrentMatch = new ServerMatch()
+            {
+                MatchStart = DateTime.UtcNow,
+                Map = ServerSnapshot.CurrentMap,
+                Modification = ServerSnapshot.Mod,
+                MatchEnd = null,
+                ServerId = this.DbGameServer.ServerId,
+            };
 
             // Reset Ghosts collection
             PlayerMatchGhosts.Clear();
@@ -81,7 +90,7 @@ namespace QSB.Server
 
         internal void NoMatches()
         {
-            MatchStart = null;
+            CurrentMatch = null;
             // Reset Ghosts collection
             PlayerMatchGhosts.Clear();
 
