@@ -23,7 +23,6 @@ namespace QSB.GameServerInterface.Dtls
             CipherSuite.TLS_DHE_PSK_WITH_AES_128_CBC_SHA
         };
 
-
         protected TlsSession mSession;
         protected TlsPskIdentity mPskIdentity;
 
@@ -47,27 +46,6 @@ namespace QSB.GameServerInterface.Dtls
         {
             return mPskIdentity;
         }
-        //public override TlsKeyExchange GetKeyExchange()
-        //{
-        //    int keyExchangeAlgorithm = TlsUtilities.GetKeyExchangeAlgorithm(mSelectedCipherSuite);
-
-        //    switch (keyExchangeAlgorithm)
-        //    {
-        //        case KeyExchangeAlgorithm.DHE_PSK:
-        //        case KeyExchangeAlgorithm.ECDHE_PSK:
-        //        case KeyExchangeAlgorithm.PSK:
-        //        case KeyExchangeAlgorithm.RSA_PSK:
-        //            return CreatePskKeyExchange(keyExchangeAlgorithm);
-
-        //        default:
-        //            /*
-        //                * Note: internal error here; the TlsProtocol implementation verifies that the
-        //                * server-selected cipher suite was in the list of client-offered cipher suites, so if
-        //                * we now can't produce an implementation, we shouldn't have offered it!
-        //                */
-        //            throw new TlsFatalAlert(AlertDescription.internal_error);
-        //    }
-        //}
 
         public override TlsAuthentication GetAuthentication()
         {
@@ -104,8 +82,6 @@ namespace QSB.GameServerInterface.Dtls
         public override void NotifyServerVersion(ProtocolVersion serverVersion)
         {
             base.NotifyServerVersion(serverVersion);
-
-            Console.WriteLine("Negotiated " + serverVersion);
         }
 
         public override void NotifyHandshakeComplete()
@@ -118,14 +94,14 @@ namespace QSB.GameServerInterface.Dtls
                 byte[] newSessionID = newSession.SessionID;
                 string hex = Hex(newSessionID);
 
-                if (this.mSession != null && Arrays.AreEqual(this.mSession.SessionID, newSessionID))
-                {
-                    Console.WriteLine("Resumed session: " + hex);
-                }
-                else
-                {
-                    Console.WriteLine("Established session: " + hex);
-                }
+                //if (this.mSession != null && Arrays.AreEqual(this.mSession.SessionID, newSessionID))
+                //{
+                //    Console.WriteLine("Resumed session: " + hex);
+                //}
+                //else
+                //{
+                //    Console.WriteLine("Established session: " + hex);
+                //}
 
                 this.mSession = newSession;
             }

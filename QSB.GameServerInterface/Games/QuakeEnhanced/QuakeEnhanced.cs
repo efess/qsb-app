@@ -168,11 +168,8 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
                 PlayerBytesToString(pReplyPacket.PlayerName),
                 pReplyPacket.PlayerNumber);
 
-            // Frags are -99 (observer)
-            if (pReplyPacket.FragCount > 65000)
-                playerInfo.Frags = -99;
-            else
-                playerInfo.Frags = pReplyPacket.FragCount;
+
+            playerInfo.Frags = (short)pReplyPacket.FragCount;
 
             playerInfo.PantColor = (int)pReplyPacket.PantColor;
             playerInfo.ShirtColor = (int)pReplyPacket.ShirtColor;

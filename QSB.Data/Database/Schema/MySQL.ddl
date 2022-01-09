@@ -782,7 +782,7 @@ from
 GameServer gs
 inner join ServerData sd
   ON gs.ServerId = sd.ServerId
-inner join ServerMatch sm
+left outer join ServerMatch sm
   ON sm.ServerMatchId = (SELECT  ServerMatchId 
                         from ServerMatch 
                         WHERE ServerId = sd.ServerId 

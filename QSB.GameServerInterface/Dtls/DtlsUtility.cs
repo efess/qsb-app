@@ -1,11 +1,5 @@
 ﻿using Org.BouncyCastle.Tls;
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Net.Sockets;
-using Org.BouncyCastle.Security;
 using QSB.GameServerInterface.Dtls;
 
 namespace QSB.GameServerInterface.Games.QuakeEnhanced

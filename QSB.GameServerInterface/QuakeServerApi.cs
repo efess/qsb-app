@@ -88,6 +88,7 @@ namespace QSB.GameServerInterface
             catch (Exception ex)
             {
                 LastError = new ServerQueryParseException(ex);
+                Console.WriteLine("Error querying " + pServerAddress + ": " + ex.Message);
                 serverInfo.Status = ServerStatus.QueryError;
             }
 
