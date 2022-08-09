@@ -44,7 +44,6 @@ namespace QSB.Server
 
         public List<PlayerActivity> PlayerActivities { get; private set; }
         public List<PlayerActivity> PlayerMatchGhosts { get; private set; }
-
         /// <summary>
         /// Current match
         /// </summary>

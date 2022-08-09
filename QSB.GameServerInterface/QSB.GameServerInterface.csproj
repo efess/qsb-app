@@ -135,6 +135,8 @@
   <ItemGroup>
     <Compile Include="Dtls\PskDtlsClient.cs" />
     <Compile Include="Exceptions.cs" />
+    <Compile Include="Games\Common\IClothed.cs" />
+    <Compile Include="Games\Common\ISkinned.cs" />
     <Compile Include="Games\NetQuake\NetQuake.cs" />
     <Compile Include="Games\NetQuake\NetQuakePlayer.cs" />
     <Compile Include="Games\Quake2\Quake2.cs" />
@@ -147,6 +149,7 @@
     <Compile Include="Games\QuakeWorld\QuakeWorld.cs" />
     <Compile Include="Interfaces\INetCommunicate.cs" />
     <Compile Include="Interfaces\IServerInfoProvider.cs" />
+    <Compile Include="ModMode.cs" />
     <Compile Include="Packets\NetQuake\PlayerInfoReply.cs" />
     <Compile Include="Packets\NetQuake\PlayerInfoRequest.cs" />
     <Compile Include="Packets\NetQuake\ReplyPacket.cs" />
@@ -162,6 +165,7 @@
     <Compile Include="Packets\Quake3\Q3ServerStatus.cs" />
     <Compile Include="Packets\QuakeWorld\QWPlayerStatus.cs" />
     <Compile Include="Packets\QuakeWorld\QWServerStatus.cs" />
+    <Compile Include="Parameters.cs" />
     <Compile Include="PlayerSnapshot.cs" />
     <Compile Include="PlayerInfos.cs" />
     <Compile Include="QuakeServerApi.cs" />

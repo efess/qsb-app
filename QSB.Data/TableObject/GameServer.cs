@@ -56,6 +56,8 @@ namespace QSB.Data.TableObject
         public virtual string CustomNameShort { get; set; }
 
         public virtual bool Active { get; set; }
+        public virtual string ApiKey { get; set; }
+        public virtual string Parameters { get; set; }
 
         public override string ToString()
         {

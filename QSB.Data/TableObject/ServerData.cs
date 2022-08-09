@@ -30,7 +30,8 @@ namespace QSB.Data.TableObject
         public virtual int ServerId { get; set;}
         public virtual DateTime TimeStamp { get; set;}
         public virtual string Map { get; set;}
-        public virtual string Modification { get; set;}
+        public virtual string Modification { get; set; }
+        public virtual string Mode { get; set; }
         public virtual string PlayerData { get; set; }
         public virtual string Name { get; set; }
         public virtual string IpAddress { get; set; }

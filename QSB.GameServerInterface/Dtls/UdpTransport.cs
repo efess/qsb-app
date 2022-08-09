@@ -17,8 +17,8 @@ namespace QSB.GameServerInterface.Dtls
         public UdpTransport(string address, int port)
         {
             _client = new UdpClient(address, port);
-            _client.Client.ReceiveTimeout = 3000;
-            _client.Client.SendTimeout = 3000;
+            _client.Client.ReceiveTimeout = 5000;
+            _client.Client.SendTimeout = 5000;
         }
         public void Close()
         {
@@ -51,7 +51,7 @@ namespace QSB.GameServerInterface.Dtls
                 // Catch here and throw an alert to get out.
                 if (ex.SocketErrorCode == SocketError.TimedOut)
                 {
-                    throw new TlsFatalAlert(AlertDescription.internal_error);
+                        throw new TlsFatalAlert(AlertDescription.internal_error);
                 }
                 throw;
             }

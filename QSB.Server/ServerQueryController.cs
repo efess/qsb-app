@@ -139,17 +139,17 @@ namespace QSB.Server
                         // Connected to the server, no response however
                     case ServerStatus.NotResponding:
                         if (gameServer.FailedQueryAttempts > 10)
-                            gameServer.NextQuery = DateTime.UtcNow.AddMinutes(15);
+                            gameServer.NextQuery = DateTime.UtcNow.AddMinutes(1);
                         break;
                     case ServerStatus.NotFound:
                         // Couldn't connect or find the server
                         if (gameServer.FailedQueryAttempts > 10)
-                            gameServer.NextQuery = DateTime.UtcNow.AddHours(2);
+                            gameServer.NextQuery = DateTime.UtcNow.AddHours(10);
                         break;
                     case ServerStatus.QueryError:
                         // Couldn't find the server
                         if (gameServer.FailedQueryAttempts > 10)
-                            gameServer.NextQuery = DateTime.UtcNow.AddHours(2);
+                            gameServer.NextQuery = DateTime.UtcNow.AddHours(10);
                         break;
                 }
 

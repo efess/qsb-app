@@ -62,7 +62,7 @@ namespace QSB.Server
             do
             {
                 System.Diagnostics.Debug.WriteLine("Querying " + DbServer.DNS + ":" + DbServer.Port.ToString());
-                serverInfo = _serverInterface.GetServerInfo(DbServer.DNS.Trim(), DbServer.Port, (Game)DbServer.GameId);
+                serverInfo = _serverInterface.GetServerInfo(DbServer.DNS.Trim(), DbServer.Port, (Game)DbServer.GameId, DbServer.Parameters);
                 // Retry logic:
             } while (pRetryCount++ < SERVER_NOT_RESPONDING_RETRY_COUNT
                 && serverInfo.Status == ServerStatus.NotResponding);

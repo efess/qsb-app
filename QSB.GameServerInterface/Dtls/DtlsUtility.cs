@@ -4,16 +4,23 @@ using QSB.GameServerInterface.Dtls;
 
 namespace QSB.GameServerInterface.Games.QuakeEnhanced
 {
-    public class DtlsUtility
+    public class DtlsUtility : INetCommunicate
     {
         private byte[] _psk;
         private byte[] _pskId;
         private DatagramTransport dtlsTransport;
 
+        public string RemoteIpAddress { get; set; }
+
+        public int RemotePort { get; set; }
+
         public DtlsUtility(byte[] psk, byte[] pskId, string serverAddress, int port)
         {
             _psk = psk;
             _pskId = pskId;
+
+            RemoteIpAddress = serverAddress;
+            RemotePort = port;
 
             var client = new PskDtlsClient(new BasicTlsPskIdentity(_pskId, _psk));
             var transport = new UdpTransport(serverAddress, port);
@@ -26,7 +33,7 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
         {
             dtlsTransport.Send(tosend, 0, tosend.Length);
         }
-        public byte[] SendReceive(byte[] tosend)
+        public byte[] SendBytes(byte[] tosend)
         {
             dtlsTransport.Send(tosend, 0, tosend.Length);
             return Receive();
@@ -42,5 +49,6 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
             }
             return new byte[] { };
         }
+
     }
 }

@@ -46,6 +46,8 @@ namespace QSB.Data.TableObject.TableMapping
             Map(x => x.CustomNameShort);
             Map(x => x.ModificationCode);
             Map(x => x.Active);
+            Map(x => x.ApiKey);
+            Map(x => x.Parameters);
         }
     }
 }

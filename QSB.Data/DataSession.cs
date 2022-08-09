@@ -417,14 +417,14 @@ namespace QSB.Data
 
             if (!wasInTransaction)
                 CommitTransaction();
-
+            
             return newPlayer;
         }
 
         public virtual int NextPlayerId()
         {
             IQuery query = _DbSession.CreateSQLQuery("SELECT ifnull(MAX(PlayerId),0) FROM Player");
-            return query.UniqueResult<int>();
+            return Convert.ToInt32(query.UniqueResult()) + 1;
         }
 
         public virtual void FlushData()

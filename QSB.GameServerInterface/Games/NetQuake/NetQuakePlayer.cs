@@ -16,6 +16,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with QSBrowser.  If not, see <http://www.gnu.org/licenses/>.
  */
+using QSB.GameServerInterface.Games.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,7 +24,7 @@ using System.Text;
 
 namespace QSB.GameServerInterface.Games.NetQuake
 {
-    public class NetQuakePlayer : PlayerSnapshot
+    public class NetQuakePlayer : PlayerSnapshot, IClothed
     {
         // Netquake only properties
         public int ShirtColor { get; internal set; }

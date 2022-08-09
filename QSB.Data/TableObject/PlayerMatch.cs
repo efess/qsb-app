@@ -30,8 +30,8 @@ namespace QSB.Data.TableObject
         public virtual int ServerMatchId { get; set; }
         public virtual int PlayerId { get; set; }
         public virtual int AliasId { get; set; }
-        public virtual int PantColor { get; set; }
         public virtual int ShirtColor { get; set; }
+        public virtual int PantColor { get; set; }
         public virtual string Model { get; set; }
         public virtual string Skin { get; set; }
         public virtual int Latency { get; set; }

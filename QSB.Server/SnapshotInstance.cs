@@ -27,6 +27,7 @@ using System.Xml.Linq;
 using System.Xml;
 using System.IO;
 using Newtonsoft.Json;
+using QSB.GameServerInterface.Games.Common;
 
 namespace QSB.Server
 {
@@ -44,6 +45,7 @@ namespace QSB.Server
             serverData.ServerId = _activity.DbGameServer.ServerId;
             serverData.Map = _activity.ServerSnapshot.CurrentMap;
             serverData.Modification = _activity.ServerSnapshot.Mod;
+            serverData.Mode = _activity.ServerSnapshot.Mode;
             serverData.TimeStamp = _activity.SnapshotTime;
             serverData.Name = _activity.ServerSnapshot.ServerName;
             serverData.ServerSettings = _activity.ServerSnapshot.ServerSettingsJson.Trim();
@@ -74,19 +76,16 @@ namespace QSB.Server
                         : 0
                 };
 
-                switch (pGame)
+                if (player is IClothed)
                 {
-                    case Game.NetQuake:
-                        playerData.Shirt = (player as
-                            QSB.GameServerInterface.Games.NetQuake.NetQuakePlayer).ShirtColor;
-                        playerData.Pant = (player as
-                            QSB.GameServerInterface.Games.NetQuake.NetQuakePlayer).PantColor;;
-                        break;
-                    default:
-                        playerData.Model = player.ModelName;
-                        playerData.Skin = player.SkinName;
+                    playerData.Shirt = (player as IClothed).ShirtColor;
+                    playerData.Pant = (player as IClothed).PantColor;
+                }
 
-                        break;
+                if (!string.IsNullOrEmpty(player.ModelName))
+                {
+                    playerData.Model = player.ModelName;
+                    playerData.Skin = player.SkinName;
                 }
 
                 return playerData;

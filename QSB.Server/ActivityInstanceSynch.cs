@@ -116,11 +116,13 @@ namespace QSB.Server
             if (pActivity.CurrentMatch != null &&
                 (playerResetCount > 1
                 || pActivity.ServerSnapshot.Mod != pSnapshot.Mod
+                || pActivity.ServerSnapshot.Mode != pSnapshot.Mode
                 || pActivity.ServerSnapshot.CurrentMap != pSnapshot.CurrentMap
-                || pSnapshot.Players.Count < 2))
+                || pSnapshot.Players.Where(p => p.Frags >= -1).Count() < 2))
             {
                 // Create a ServerMatch record
                 ServerMatch serverMatch = pActivity.CurrentMatch;
+                serverMatch.Mode = pActivity.ServerSnapshot.Mode;
                 serverMatch.Modification = pActivity.ServerSnapshot.Mod;
                 serverMatch.Map = pActivity.ServerSnapshot.CurrentMap;
                 serverMatch.ServerId = _gameServer.ServerId;
@@ -176,89 +178,7 @@ namespace QSB.Server
                 }
             }
 
-            ///////OLD WAY::::::::::
-
-            //// Determine which players have left, and update players that havne't
-            //for(int i = pActivity.PlayerActivities.Count-1; i >= 0; i--)
-            //{
-            //    PlayerActivity oldPlayer = pActivity.PlayerActivities[i];
-            //    int index = pSnapshot.Players.IndexOf(oldPlayer.PlayerSnap);
-            //    if (index >= 0)
-            //    {
-            //        PlayerSnapshot playerInfo = pSnapshot.Players[index];
-            //        oldPlayer.UpdatePlayer(playerInfo
-            //            ,_dataSession.GetOrCreatePlayer(playerInfo.PlayerName,playerInfo.IpAddress,playerInfo.PlayerNameBytes, _gameServer.GameId)
-            //            ,false
-            //        );
-
-            //        if(oldPlayer.IsScoreReset)
-            //            playerResetCount++;
-            //    }
-            //    else
-            //    {
-            //        _dataSession.AddUpdatePlayerSession(oldPlayer.EndSession());
-
-            //        pActivity.PlayerMatchGhosts.Add(oldPlayer);
-            //        pActivity.PlayerGhostSnapshots.Add(oldPlayer.PlayerSnap);
-            //        pActivity.PlayerActivities.Remove(oldPlayer);
-            //    }
-            //}
-
-            // Iterate through snapshot finding players not accounted for
-            //foreach (PlayerSnapshot pInfo in pSnapshot.Players)
-            //{
-            //    // See if old snapshot contains player
-            //    if (!pActivity.ServerSnapshot.Players.Contains(pInfo))
-            //    {
-            //        bool foundGhost = false;
-            //        // Check ghosts for player
-            //        foreach (PlayerActivity ghost in pActivity.PlayerMatchGhosts)
-            //        {
-            //            if (ghost.PlayerSnap.Equals(pInfo))
-            //            {
-            //                foundGhost = true;
-            //                pActivity.PlayerMatchGhosts.Remove(ghost);
-            //                pActivity.PlayerActivities.Add(ghost);
-            //                ghost.UpdatePlayer(pInfo
-            //                    ,_dataSession.GetOrCreatePlayer(pInfo.PlayerName, pInfo.IpAddress, pInfo.PlayerNameBytes, _gameServer.GameId)
-            //                    ,true
-            //                    );
-            //                break;
-
-            //            }
-            //        }
-            //        if (!foundGhost)
-            //        {
-            //            pActivity.PlayerActivities.Add(new PlayerActivity(pInfo,
-            //                _dataSession.GetOrCreatePlayer(pInfo.PlayerName, pInfo.IpAddress, pInfo.PlayerNameBytes, _gameServer.GameId)
-            //                ));
-            //        }
-            //    }
-            //}
-
-            //if (pActivity.PlayerActivities.Count != pSnapshot.Players.Count)
-            //    throw new Exception("Player count mismatch");
-            
             pActivity.UpdateSnapshot(pSnapshot);
-
-            // DEBUG
-            //if (pActivity.PlayerMatchGhosts.Count > 0)
-            //    System.Diagnostics.Debug.WriteLine("Ghosts in " + _gameServer.DNS);
-
-            //foreach (PlayerActivity activity in pActivity.PlayerMatchGhosts)
-            //{
-            //    System.Diagnostics.Debug.WriteLine(activity.PlayerSnap.PlayerName.ToString() + "  < GHOST ");
-            //}
-
-            //if (pActivity.PlayerActivities.Count > 0)
-            //    System.Diagnostics.Debug.WriteLine("Players here");
-
-            //foreach (PlayerActivity activity in pActivity.PlayerActivities)
-            //{
-            //    System.Diagnostics.Debug.WriteLine(activity.PlayerSnap.PlayerName.ToString() + "   ");
-            //}
-
-            ////// END GIGANTIC OLD UPDATE CODE ///////
 
             // Save Sessions
             foreach (PlayerActivity player in pActivity.PlayerActivities)
@@ -339,7 +259,7 @@ namespace QSB.Server
             playerMatch.AliasId = pActivity.Session.LastAlias.AliasId;
             playerMatch.PlayerId = pActivity.Session.PlayerId;
             playerMatch.ServerMatchId = pServerMatchId;
-
+            
             if (playerMatch.PlayerMatchEnd == null)
                 playerMatch.PlayerMatchEnd = DateTime.UtcNow;
 

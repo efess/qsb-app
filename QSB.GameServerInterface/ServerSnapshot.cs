@@ -64,6 +64,10 @@ namespace QSB.GameServerInterface
         /// </summary>
         public string Mod { get;  set; }
         /// <summary>
+        /// Modification Mode
+        /// </summary>
+        public string Mode { get; set; }
+        /// <summary>
         /// Current server status
         /// </summary>
         public ServerStatus Status { get;  set;}

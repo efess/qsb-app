@@ -31,6 +31,7 @@ namespace QSB.Data.TableObject.TableMapping
             Id(x => x.ServerMatchId);
             Map(x => x.Map);
             Map(x => x.Modification);
+            Map(x => x.Mode);
             Map(x => x.MatchEnd);
             Map(x => x.MatchStart);
             Map(x => x.ServerId);

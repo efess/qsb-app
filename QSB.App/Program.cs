@@ -35,6 +35,7 @@ namespace QSB.App
 
         static void Main(string[] args)
         {
+            Environment.SetEnvironmentVariable("QE_PSK", "7a55b980c49b9ae4d4ffdb3513c2e471d94b14c22077ed86");
             string connectionString = Environment.GetEnvironmentVariable("DB_CONN_STRING") ??
                 ConfigurationSettings.AppSettings["ConnectionString"] as string;
             string stringDatabaseEngine = Environment.GetEnvironmentVariable("DB_ENGINE") ??

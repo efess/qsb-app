@@ -32,6 +32,7 @@ namespace QSB.Data.TableObject.TableMapping
             Map(x => x.ServerId);
             Map(x => x.Map);
             Map(x => x.Modification);
+            Map(x => x.Mode);
             Map(x => x.PlayerData);
             Map(x => x.TimeStamp);
             Map(x => x.ServerSettings);

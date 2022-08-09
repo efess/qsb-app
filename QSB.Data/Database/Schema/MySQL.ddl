@@ -23,7 +23,8 @@ ModificationCode VARCHAR(50),
 Modification VARCHAR(50),
 Category VARCHAR(50),
 Active BOOL,
-CustomModificationName VARCHAR(50)
+CustomModificationName VARCHAR(50),
+ApiKey VARCHAR(50)
 );
 
 CREATE INDEX  ON GameServer(
@@ -168,7 +169,8 @@ Map varchar(50)  NULL,
 Modification VARCHAR(50)  NULL,
 MatchStart DATETIME  NULL,
 MatchEnd DATETIME  NULL,
-ServerId INTEGER  NULL
+ServerId INTEGER  NULL,
+Mode VARCHAR(50) NULL
 );
 
 CREATE INDEX IDX_SERVERMATCH_ ON ServerMatch(
@@ -200,7 +202,8 @@ PlayerData TEXT NULL,
 ServerSettings TEXT NULL,
 MaxPlayers INTEGER NULL,
 IpAddress VARCHAR(50) NULL,
-Name VARCHAR(255) NULL
+Name VARCHAR(255) NULL,
+Mode VARCHAR(50) NULL
 );
 
 CREATE INDEX IDX_SERVERDATA_ ON ServerData(
@@ -210,6 +213,17 @@ ServerId  ASC
 CREATE TABLE UserAccess (
 UserId INTEGER  PRIMARY KEY NULL,
 Name VARCHAR(50)  NULL,
+Password VARCHAR(50)  NULL,
+AccessLevel INTEGER  NULL,
+LastIpAddress VARCHAR(50)  NULL,
+LastUrl TEXT  NULL,
+LastAccessed DateTime NULL
+);
+
+
+CREATE TABLE ServerAccess (
+ServerId INTEGER  PRIMARY KEY NULL,
+Key VARCHAR(50)  NULL,
 Password VARCHAR(50)  NULL,
 AccessLevel INTEGER  NULL,
 LastIpAddress VARCHAR(50)  NULL,
@@ -390,32 +404,47 @@ IN p_pageRecordCount INTEGER,
 IN p_pageRecordOffset INTEGER)
 BEGIN
 	DECLARE SQLs VARCHAR(10000);
-	
-	SET @SQLs = CONCAT('SELECT
-	ServerMatch.ServerMatchId as MatchId,
-	DATE_FORMAT(ServerMatch.MatchStart, ''%Y-%m-%dT%TZ'') as MatchStart,
+	SET @SQLs = CONCAT('CREATE TEMPORARY TABLE ids
+    SELECT ServerMatch.ServerMatchId
+	FROM ServerMatch
+    WHERE ServerMatch.ServerId = ', p_serverId, '
+	AND TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd, UTC_TIMESTAMP())) > 10
+	ORDER BY UNIX_TIMESTAMP(ServerMatch.MatchStart) DESC
+	LIMIT ', p_pageRecordCount, ' OFFSET ', p_pageRecordOffset, ';');
+    
+	PREPARE query FROM @SQLs;
+	EXECUTE query;
+	DEALLOCATE PREPARE query;
+
+	SELECT
+	ServerMatch.ServerMatchId as ServerMatchId,
+	DATE_FORMAT(ServerMatch.MatchStart, '%Y-%m-%dT%TZ') as MatchStart,
 	GameServer.GameId as GameId,
 	GameServer.DNS as HostName,
 	GameServer.Port As Port,
 	ServerData.Name as ServerName,
 	GameServer.ServerId as ServerId,
 	ServerMatch.Map as Map,
-	GameServer.ModificationCode as Modification,
-	(SELECT Count(PlayerMatch.AliasId) FROM PlayerMatch WHERE ServerMatch.ServerMatchId = PlayerMatch.ServerMatchId) AS PlayerCount,
-	TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd,UTC_TIMESTAMP())) as MatchDuration
+	ServerMatch.Modification as Modification,
+	ServerMatch.Mode as Mode,
+	TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd,UTC_TIMESTAMP())) as Duration,
+	Player.PlayerId,
+    Player.Alias as PlayerName,
+	PlayerMatch.Frags as Frags,
+	PlayerMatch.PantColor as PantColor,
+	PlayerMatch.ShirtColor as ShirtColor,
+	DATE_FORMAT(PlayerMatch.PlayerMatchStart, '%Y-%m-%dT%TZ') as PlayerMatchStart,
+	DATE_FORMAT(PlayerMatch.PlayerMatchEnd, '%Y-%m-%dT%TZ') as PlayerMatchEnd,
+	TIMESTAMPDIFF(SECOND, PlayerMatch.PlayerMatchStart, ifnull(PlayerMatch.PlayerMatchEnd,UTC_TIMESTAMP())) as PlayerStayDuration
 	FROM ServerMatch
+    INNER JOIN ids on (ids.ServerMatchId = ServerMatch.ServerMatchId)
 	inner join GameServer on (ServerMatch.ServerId = GameServer.ServerId)
 	inner join ServerData on (ServerMatch.ServerId = ServerData.ServerId)
-	WHERE GameServer.ServerId = ',p_serverId, '
-	AND TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd,UTC_TIMESTAMP())) > 10
-	ORDER BY UNIX_TIMESTAMP(ServerMatch.MatchStart) DESC
-	LIMIT ', p_pageRecordCount, ' OFFSET ', p_pageRecordOffset, ';');
+    INNER JOIN PlayerMatch on (ids.ServerMatchId = PlayerMatch.ServerMatchId)
+	INNER JOIN Player on (PlayerMatch.AliasId = Player.AliasId);
 	
-	PREPARE query FROM @SQLs;
-	EXECUTE query;
 END //
 DELIMITER ;
-
 
 DROP PROCEDURE IF EXISTS spServerMatchesCount;
 
@@ -749,16 +778,11 @@ CREATE VIEW vServerDetail AS
 SELECT
 sd.ServerDataId as ServerDataId
 ,gs.ServerId as ServerId
-,gs.CustomName as CustomName
-,gs.CustomNameShort as CustomNameShort
 ,gs.DNS as DNS
 ,gs.Port as Port
 ,gs.GameId as GameId
-,gs.PublicSiteUrl as PublicSiteUrl
-,gs.MapDownloadUrl as MapDownloadUrl
 ,gs.Location as Location
-,gs.QueryInterval as QueryInterval
-,gs.FailedQueryAttempts as FailedQueryAttempts
+,gs.LastQuerySuccess as LastQuerySuccess
 ,gs.Region as Region
 ,gs.ModificationCode as ModificationCode
 ,gs.Category as Category
@@ -768,6 +792,7 @@ sd.ServerDataId as ServerDataId
 ,sd.Map as Map
 ,sd.ServerSettings as ServerSettings
 ,sd.Modification as Modification
+,sd.Mode as Mode
 ,sd.PlayerData as PlayerData
 ,sd.Timestamp as Timestamp
 ,sd.MaxPlayers as MaxPlayers
@@ -787,7 +812,8 @@ left outer join ServerMatch sm
                         from ServerMatch 
                         WHERE ServerId = sd.ServerId 
                         ORDER BY MatchStart 
-                        DESC LIMIT 1);
+                        DESC LIMIT 1)
+WHERE Active = 1;
 
 
 DROP PROCEDURE IF EXISTS spAddUpdateGameServer;
@@ -1138,42 +1164,59 @@ ORDER BY (select TIMESTAMPDIFF(SECOND, ifnull(SessionEnd,UTC_TIMESTAMP), UTC_TIM
 END //
 DELIMITER ;
 
-
 DROP PROCEDURE IF EXISTS spServerMatches;
 
 DELIMITER //
-CREATE PROCEDURE spServerMatches (
+
+CREATE PROCEDURE `spServerMatches`(
 IN p_serverId INTEGER,
 IN p_pageRecordCount INTEGER,
 IN p_pageRecordOffset INTEGER)
 BEGIN
-	DECLARE SQLs VARCHAR(10000);
-	
-	SET @SQLs = CONCAT('SELECT
-	sm.ServerMatchId as MatchId,
-	DATE_FORMAT(sm.MatchStart, ''%Y-%m-%dT%TZ'') as MatchStart,
-	GameServer.GameId as GameId,
-	GameServer.DNS as HostName,
-	GameServer.Port As Port,
-	ServerData.Name as ServerName,
-	GameServer.ServerId as ServerId,
-	sm.Map as Map,
-	GameServer.ModificationCode as Modification,
-	(SELECT Count(PlayerMatch.AliasId) FROM PlayerMatch WHERE sm.ServerMatchId = PlayerMatch.ServerMatchId) AS PlayerCount,
-	TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) as MatchDuration
-	FROM ServerMatch as sm
-	inner join GameServer on (sm.ServerId = GameServer.ServerId)
-	inner join ServerData on (sm.ServerId = ServerData.ServerId)
-	WHERE GameServer.ServerId = ',p_serverId, '
-	AND EXISTS (SELECT * FROM PlayerMatch as pm1 WHERE pm1.ServerMatchId = sm.ServerMatchId AND pm1.Frags > 0)
-	AND TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) > 10
-	ORDER BY UNIX_TIMESTAMP(sm.MatchStart) DESC
-	LIMIT ', p_pageRecordCount, ' OFFSET ', p_pageRecordOffset, ';');
-	
-	PREPARE query FROM @SQLs;
-	EXECUTE query;
+DECLARE SQLs VARCHAR(10000);
+SET @SQLs = CONCAT('CREATE TEMPORARY TABLE ids
+    SELECT ServerMatch.ServerMatchId
+FROM ServerMatch
+    WHERE ServerMatch.ServerId = ', p_serverId, '
+AND TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd, UTC_TIMESTAMP())) > 10
+AND EXISTS (SELECT * FROM PlayerMatch as pm1 WHERE pm1.ServerMatchId = ServerMatch.ServerMatchId AND pm1.Frags > 0)
+ORDER BY UNIX_TIMESTAMP(ServerMatch.MatchStart) DESC
+LIMIT ', p_pageRecordCount, ' OFFSET ', p_pageRecordOffset, ';');
+
+PREPARE query FROM @SQLs;
+EXECUTE query;
+DEALLOCATE PREPARE query;
+
+SELECT
+ServerMatch.ServerMatchId as ServerMatchId,
+DATE_FORMAT(ServerMatch.MatchStart, '%Y-%m-%dT%TZ') as MatchStart,
+GameServer.GameId as GameId,
+GameServer.DNS as HostName,
+GameServer.Port As Port,
+ServerData.Name as ServerName,
+GameServer.ServerId as ServerId,
+ServerMatch.Map as Map,
+ServerMatch.Mod as Mod,
+ServerMatch.Mode as Mode,
+TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd,UTC_TIMESTAMP())) as Duration,
+Player.PlayerId,
+    Player.Alias as PlayerName,
+PlayerMatch.Frags as Frags,
+PlayerMatch.PantColor as PantColor,
+PlayerMatch.ShirtColor as ShirtColor,
+DATE_FORMAT(PlayerMatch.PlayerMatchStart, '%Y-%m-%dT%TZ') as PlayerMatchStart,
+DATE_FORMAT(PlayerMatch.PlayerMatchEnd, '%Y-%m-%dT%TZ') as PlayerMatchEnd,
+TIMESTAMPDIFF(SECOND, PlayerMatch.PlayerMatchStart, ifnull(PlayerMatch.PlayerMatchEnd,UTC_TIMESTAMP())) as PlayerStayDuration
+FROM ServerMatch
+    INNER JOIN ids on (ids.ServerMatchId = ServerMatch.ServerMatchId)
+inner join GameServer on (ServerMatch.ServerId = GameServer.ServerId)
+inner join ServerData on (ServerMatch.ServerId = ServerData.ServerId)
+    INNER JOIN PlayerMatch on (ids.ServerMatchId = PlayerMatch.ServerMatchId)
+INNER JOIN Player on (PlayerMatch.AliasId = Player.AliasId);
+
 END //
 DELIMITER ;
+
 
 
 DROP PROCEDURE IF EXISTS spServerMatchesCount;
@@ -1207,7 +1250,6 @@ CREATE PROCEDURE spServerPlayerWeeklyRanking (
 	IN p_serverId INTEGER)
 
 BEGIN
-	
 	SELECT sub.*, p.AliasBytes,
 		(SELECT sm1.ServerMatchId 
 		from 	PlayerMatch  as pm1
@@ -1313,29 +1355,47 @@ DROP PROCEDURE IF EXISTS spServerRecentMatches;
 DELIMITER //
 
 CREATE PROCEDURE spServerRecentMatches (
-	IN p_gameId INTEGER)
+)
 
 BEGIN
-	
-	SELECT		sm.ServerMatchId,
-				gs.ServerId,
-				gs.DNS as HostName,
-				gs.Port as Port,
-				gs.GameId,
-				TIMESTAMPDIFF(SECOND, ifnull(sm.MatchEnd, UTC_TIMESTAMP), UTC_TIMESTAMP()) as MatchEndAgo,
-				TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) as Duration,
-				sm.Map as Map,
-				gs.ModificationCode as Modification,
-				(SELECT Count(pm.AliasId) FROM PlayerMatch as pm WHERE sm.ServerMatchId = pm.ServerMatchId) AS PlayerCount
-	FROM		ServerMatch as sm
-	INNER JOIN 	GameServer as gs on (sm.ServerId = gs.ServerId)
-	WHERE		EXISTS (SELECT * FROM PlayerMatch as pm WHERE pm.Frags > 0 AND pm.ServerMatchId = sm.ServerMatchId)
-	AND			TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) > 60
-	AND			sm.MatchStart > Date_Add(Current_Date(),INTERVAL -30 DAY) 
-	AND			(gs.GameId = p_gameId OR p_gameId = -1)
-	ORDER BY 	sm.MatchEnd DESC
-	LIMIT 10;
-	
+    SELECT      sm.ServerMatchId,
+                gs.ServerId,
+                sd.Name as ServerName,
+                gs.DNS as HostName,
+                gs.Port as Port,
+                gs.GameId,
+                sm.MatchStart as MatchStart,
+                sm.MatchEnd as MatchEnd,
+                TIMESTAMPDIFF(SECOND, sm.MatchStart, ifnull(sm.MatchEnd,UTC_TIMESTAMP())) as Duration,
+                sm.Map as Map,
+                gs.ModificationCode as Modification,
+                p.PlayerId,
+                p.Alias as PlayerName,
+                pm.Frags as Frags,
+                pm.PantColor as PantColor,
+                pm.ShirtColor as ShirtColor,
+                DATE_FORMAT(pm.PlayerMatchStart, '%Y-%m-%dT%TZ') as PlayerMatchStart,
+                DATE_FORMAT(pm.PlayerMatchEnd, '%Y-%m-%dT%TZ') as PlayerMatchEnd,
+                TIMESTAMPDIFF(SECOND, pm.PlayerMatchStart, ifnull(pm.PlayerMatchEnd,UTC_TIMESTAMP())) as PlayerStayDuration
+    FROM        ServerMatch as sm
+    INNER JOIN  GameServer as gs on (sm.ServerId = gs.ServerId)
+    INNER JOIN  PlayerMatch as pm on (sm.ServerMatchId = pm.ServerMatchId)
+    INNER JOIN  Player as p on (pm.AliasId = p.AliasId)
+    INNER JOIN  ServerData as sd on (sd.ServerId = sm.ServerId)
+    JOIN 
+        (SELECT distinct ServerMatch.ServerMatchId
+        FROM ServerMatch
+        INNER JOIN 	PlayerMatch on (ServerMatch.ServerMatchId = PlayerMatch.ServerMatchId)
+        WHERE
+        EXISTS      (SELECT * FROM PlayerMatch WHERE PlayerMatch.Frags > 0 AND PlayerMatch.ServerMatchId = PlayerMatch.ServerMatchId)
+        AND         TIMESTAMPDIFF(SECOND, ServerMatch.MatchStart, ifnull(ServerMatch.MatchEnd,UTC_TIMESTAMP())) > 60
+        AND         ServerMatch.MatchStart > Date_Add(Current_Date(),INTERVAL -30 DAY)
+        LIMIT 10
+        ) limiter
+    ON sm.ServerMatchId
+    IN (limiter.ServerMatchId)
+    ORDER BY        sm.MatchEnd DESC;
+
 END //
 DELIMITER ;
 
@@ -1421,3 +1481,43 @@ BEGIN
 END//
 
 DELIMITER ;
+
+
+-- Change delimiter so that the function body doesn't end the function declaration
+DELIMITER //
+
+CREATE FUNCTION uuid_v4()
+    RETURNS CHAR(36) NO SQL
+BEGIN
+    -- Generate 8 2-byte strings that we will combine into a UUIDv4
+    SET @h1 = LPAD(HEX(FLOOR(RAND() * 0xffff)), 4, '0');
+    SET @h2 = LPAD(HEX(FLOOR(RAND() * 0xffff)), 4, '0');
+    SET @h3 = LPAD(HEX(FLOOR(RAND() * 0xffff)), 4, '0');
+    SET @h6 = LPAD(HEX(FLOOR(RAND() * 0xffff)), 4, '0');
+    SET @h7 = LPAD(HEX(FLOOR(RAND() * 0xffff)), 4, '0');
+    SET @h8 = LPAD(HEX(FLOOR(RAND() * 0xffff)), 4, '0');
+
+    -- 4th section will start with a 4 indicating the version
+    SET @h4 = CONCAT('4', LPAD(HEX(FLOOR(RAND() * 0x0fff)), 3, '0'));
+
+    -- 5th section first half-byte can only be 8, 9 A or B
+    SET @h5 = CONCAT(HEX(FLOOR(RAND() * 4 + 8)),
+                LPAD(HEX(FLOOR(RAND() * 0x0fff)), 3, '0'));
+
+    -- Build the complete UUID
+    RETURN LOWER(CONCAT(
+        @h1, @h2, '-', @h3, '-', @h4, '-', @h5, '-', @h6, @h7, @h8
+    ));
+END
+//
+-- Switch back the delimiter
+DELIMITER ;
+
+
+CREATE TABLE ServerMatchActual (
+ServerMatchActualId INTEGER PRIMARY KEY AUTO_INCREMENT NOT NULL,
+ServerId INTEGER,
+DateAdded datetime,
+Payload VARCHAR(8000)
+);
+

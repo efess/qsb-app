@@ -23,6 +23,7 @@ using System.Text;
 using QSB.GameServerInterface;
 using QSB.Data.TableObject;
 using QSB.GameServerInterface.Games.NetQuake;
+using QSB.GameServerInterface.Games.Common;
 
 namespace QSB.Server
 {
@@ -129,16 +130,21 @@ namespace QSB.Server
         internal void NoMatch()
         {
             CurrentMatch = null;
+
+            shirtTally = new ValueTally<int>();
+            pantTally = new ValueTally<int>();
+            skinTally = new ValueTally<string>();
+            modelTally = new ValueTally<string>();
         }
 
         internal void UpdatePlayer(PlayerSnapshot pNewPlayerSnapshot, Player pDbPlayer, bool pResurrecting)
         {
             IsScoreReset = false;
 
-            // Update total frags if fragcount has dropped
-            if (pNewPlayerSnapshot.Frags < PlayerSnap.Frags 
+            // Update total frags if fragcount has dropped by more than 1
+            if (pNewPlayerSnapshot.Frags < (PlayerSnap.Frags - 1)
                 && PlayerSnap.Frags > 0
-                && pNewPlayerSnapshot.Frags < 5
+                && pNewPlayerSnapshot.Frags < 3
                 && !pResurrecting
                 && CurrentMatch != null)
             {
@@ -187,20 +193,18 @@ namespace QSB.Server
                         }
                         if (accum > 0)
                             CurrentMatch.Frags += accum;
-                    }
 
-                    if (pNewPlayerSnapshot is NetQuakePlayer)
-                    {
-                        NetQuakePlayer netQuakePlayer = pNewPlayerSnapshot as NetQuakePlayer;
-                        pantTally.AddValue(netQuakePlayer.PantColor);
-                        shirtTally.AddValue(netQuakePlayer.ShirtColor);
-                    }
-                    else
-                    {
-                        if(pNewPlayerSnapshot.SkinName != null)
+                        if (pNewPlayerSnapshot is IClothed)
+                        {
+                            IClothed playerWithClothes = pNewPlayerSnapshot as IClothed;
+                            pantTally.AddValue(playerWithClothes.PantColor);
+                            shirtTally.AddValue(playerWithClothes.ShirtColor);
+                        }
+                        if (pNewPlayerSnapshot.SkinName != null)
                             skinTally.AddValue(pNewPlayerSnapshot.SkinName);
-                        if(pNewPlayerSnapshot.ModelName != null)
+                        if (pNewPlayerSnapshot.ModelName != null)
                             modelTally.AddValue(pNewPlayerSnapshot.ModelName);
+
                     }
                 }
 

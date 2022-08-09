@@ -29,7 +29,7 @@ namespace QSB.Server
     /// <typeparam name="T"></typeparam>
     public class ValueTally<T>
     {
-        private const int MAXIMUM_SIZE = 100;
+        private const int MAXIMUM_SIZE = 100000;
         
         Dictionary<T, int> _valueDictionary;
         public ValueTally()

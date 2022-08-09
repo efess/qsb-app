@@ -28,6 +28,7 @@ namespace QSB.Data.TableObject
         public virtual int ServerMatchId { get; set; }
         public virtual string Modification { get; set; }
         public virtual string Map { get; set; }
+        public virtual string Mode { get; set; }
         public virtual DateTime MatchStart { get; set; }
         public virtual DateTime? MatchEnd { get; set; }
         public virtual int ServerId { get; set; }

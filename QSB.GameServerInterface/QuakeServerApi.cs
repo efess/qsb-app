@@ -23,17 +23,32 @@ using System.Text;
 using QSB.GameServerInterface.Packets;
 using QSB.Common;
 using System.Net.Sockets;
+using Org.BouncyCastle.Tls;
+using Newtonsoft.Json;
 
 namespace QSB.GameServerInterface
 {
     public interface IServerInterface
     {
         Exception LastError { get; }
-        ServerSnapshot GetServerInfo(string pServerAddress, int pServerPort, Game pGame);
+        ServerSnapshot GetServerInfo(string pServerAddress, int pServerPort, Game pGame, string pParameters);
     }
 
     public class ServerInterface : IServerInterface
     {
+        private Parameters GetParameters(string parameters)
+        {
+            if (string.IsNullOrEmpty(parameters)) { return new Parameters(); }
+            try
+            {
+                return JsonConvert.DeserializeObject<Parameters>(parameters);
+            }
+            catch (Exception ex)
+            {
+                return new Parameters();
+            }
+        }
+
         public Exception LastError { get; private set; }
 
         /// <summary>
@@ -43,8 +58,10 @@ namespace QSB.GameServerInterface
         /// <param name="pServerPort">TCP/IP port to communicate on</param>
         /// <param name="pGame">Which game type server runs</param>
         /// <returns>ServerInfo object containing gathered informatino</returns>
-        public ServerSnapshot GetServerInfo(string pServerAddress, int pServerPort, Game pGame)
+        public ServerSnapshot GetServerInfo(string pServerAddress, int pServerPort, Game pGame, string pParameters)
         {
+            var parameters = GetParameters(pParameters);
+
             IServerInfoProvider infoProvider = null;
 
             switch (pGame)
@@ -62,9 +79,13 @@ namespace QSB.GameServerInterface
                     infoProvider = new QSB.GameServerInterface.Games.Quake3.Quake3();
                     break;
                 case Game.QuakeEnhanced:
+                    if (parameters.Engine == "fte")
                     {
-                        var psk = Environment.GetEnvironmentVariable("QE_PSK");
-                        infoProvider = new QSB.GameServerInterface.Games.QuakeEnhanced.QuakeEnhanced(psk);
+                        infoProvider = new QSB.GameServerInterface.Games.QuakeWorld.QuakeWorld();
+                    }
+                    else
+                    {
+                        infoProvider = new QSB.GameServerInterface.Games.QuakeEnhanced.QuakeEnhanced(parameters);
                     }
                     break;
                 default:
@@ -84,6 +105,10 @@ namespace QSB.GameServerInterface
                     serverInfo.Status = ServerStatus.NotFound;
                 else //ex.SocketErrorCode == SocketError.TimedOut
                     serverInfo.Status = ServerStatus.NotResponding;
+            }
+            catch(TlsFatalAlert ex)
+            {
+                serverInfo.Status = ServerStatus.NotResponding;
             }
             catch (Exception ex)
             {

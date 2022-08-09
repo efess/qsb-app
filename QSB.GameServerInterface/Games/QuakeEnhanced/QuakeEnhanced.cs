@@ -19,19 +19,39 @@ along with QSBrowser.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Text;
 using QSB.GameServerInterface.Packets.NetQuake;
+using Newtonsoft.Json;
 
 namespace QSB.GameServerInterface.Games.QuakeEnhanced
 {
     public class QuakeEnhanced : IServerInfoProvider
     {
         private int _port;
-        private string _serverAddress;
-        private byte[] _psk;
+        private string _host;
         private byte[] _pskId = Encoding.UTF8.GetBytes("id-quake-ex-dtls");
+        private Parameters _serverParams;
+
         private byte getHexValue(char hex)
         {
             int val = (int)hex;
             return (byte)(val - (val < 58 ? 48 : (val < 97 ? 55 : 87)));
+        }
+
+        private INetCommunicate GetNetUtility(string pServerAddress, int pServerPort, Parameters  serverParams)
+        {
+            if (!string.IsNullOrEmpty(serverParams.Engine) && serverParams.Engine.ToLower() == "fte")
+            {
+                return new UdpUtility(pServerAddress, pServerPort);
+            } 
+            else
+            {
+                var psk = Environment.GetEnvironmentVariable("QE_PSK");
+                if (string.IsNullOrEmpty(psk))
+                {
+                    throw new ArgumentException("Quake Enhanced needs a PSK for traffic encryption");
+                }
+
+                return new DtlsUtility(StringToBytes(psk), _pskId, pServerAddress, pServerPort);
+            }
         }
 
         // I'm sure there's a one liner for this...
@@ -49,24 +69,20 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
             return bytes;
         }
 
-        public QuakeEnhanced(string psk)
+        public QuakeEnhanced(Parameters parameters)
         {
-            if (string.IsNullOrEmpty(psk))
-            {
-                throw new ArgumentException("Quake Enhanced needs a PSK for traffic encryption");
-            }
-            _psk = StringToBytes(psk);
+            _serverParams = parameters;
         }
+
         public ServerSnapshot GetServerInfo(string pServerAddress, int pServerPort)
         {
             _port = pServerPort;
-            _serverAddress = pServerAddress;
-            
-            var udp = new DtlsUtility(_psk, _pskId, pServerAddress, pServerPort);
+            _host = pServerAddress;
+            var net = GetNetUtility(pServerAddress, pServerPort, _serverParams);
             ServerSnapshot serverInfo = new ServerSnapshot();
             serverInfo.Players = new PlayerSnapshots();
 
-            byte[] bytesReceived = udp.SendReceive(new ServerInfoRequest().GetPacket());
+            byte[] bytesReceived = net.SendBytes(new ServerInfoRequest().GetPacket());
             if (bytesReceived == null)
                 throw new Exception("Communications exception");
 
@@ -81,7 +97,7 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
 
             do
             {
-                bytesReceived = udp.SendReceive(new RuleInfoRequest(ruleName).GetPacket());
+                bytesReceived = net.SendBytes(new RuleInfoRequest(ruleName).GetPacket());
                 packet = GetReplyPacket(bytesReceived);
 
                 if (!(packet is RuleInfoReply))
@@ -100,7 +116,7 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
 
             for (int i = 0; i < playerCount; i++)
             {
-                bytesReceived = udp.SendReceive(new PlayerInfoRequest(i).GetPacket());
+                bytesReceived = net.SendBytes(new PlayerInfoRequest(i).GetPacket());
                 packet = GetReplyPacket(bytesReceived);
 
                 if (!(packet is PlayerInfoReply))
@@ -164,7 +180,7 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
         {
             QuakeEnhancedPlayer playerInfo = new QuakeEnhancedPlayer(
                 pReplyPacket.PlayerName,
-                pReplyPacket.Address,
+                pReplyPacket.Address == "LOCAL" ? "HOST" : "private", // LOCAL for host, maybe port for players?
                 PlayerBytesToString(pReplyPacket.PlayerName),
                 pReplyPacket.PlayerNumber);
 

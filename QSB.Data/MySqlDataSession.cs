@@ -40,7 +40,7 @@ namespace QSB.Data
         public IList<GameServer> GetServersByLastQueried(DateTime pTimeNow)
         {
             return _DbSession.CreateCriteria(typeof(GameServer))
-                .Add(Expression.Sql("(NextQuery is null OR NextQuery < TIMESTAMP('" + pTimeNow.ToString("yyyy-MM-dd HH:mm:ss") + "')) AND (LastQuery is null OR LastQuery < TIMESTAMPADD(SECOND,-(QueryInterval), '" + pTimeNow.ToString("yyyy-MM-dd HH:mm:ss") + "'))")).List<GameServer>();
+                .Add(Expression.Sql("Active = 1 AND (NextQuery is null OR NextQuery < TIMESTAMP('" + pTimeNow.ToString("yyyy-MM-dd HH:mm:ss") + "')) AND (LastQuery is null OR LastQuery < TIMESTAMPADD(SECOND,-(QueryInterval), '" + pTimeNow.ToString("yyyy-MM-dd HH:mm:ss") + "'))")).List<GameServer>();
         }
 
         public override void ProcessStats(int pServerId, DateTime pDate)

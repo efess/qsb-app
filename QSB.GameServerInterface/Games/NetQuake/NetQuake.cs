@@ -85,7 +85,12 @@ namespace QSB.GameServerInterface.Games.NetQuake
 
                 AddPlayerInfo(reply, serverInfo);
             }
-
+            var modMode = ModModeHelper.DeriveModMode(serverInfo.ServerSettings);
+            if (modMode != null)
+            {
+                serverInfo.Mode = modMode.Mode;
+                serverInfo.Mod = modMode.Mod;
+            }
             serverInfo.Port = udp.RemotePort;
             serverInfo.IpAddress = udp.RemoteIpAddress;
 
