@@ -32,7 +32,7 @@ namespace QSB.Server
         /// <summary>
         /// If server is not responding, retry this many times
         /// </summary>
-        const int SERVER_NOT_RESPONDING_RETRY_COUNT = 1;
+        const int SERVER_NOT_RESPONDING_RETRY_COUNT = 3;
 
         public GameServer DbServer {get; private set;}
         public ServerSnapshot ServerSnapshot { get; private set; }
@@ -61,7 +61,13 @@ namespace QSB.Server
             int pRetryCount = 0;
             do
             {
-                System.Diagnostics.Debug.WriteLine("Querying " + DbServer.DNS + ":" + DbServer.Port.ToString());
+                string retryString = "";
+                if (pRetryCount > 0)
+                {
+                    Thread.Sleep(1000);
+                    retryString = " (Retry #" + pRetryCount + ")";
+                }
+                System.Diagnostics.Debug.WriteLine("Querying " + DbServer.DNS + ":" + DbServer.Port.ToString() + retryString);
                 serverInfo = _serverInterface.GetServerInfo(DbServer.DNS.Trim(), DbServer.Port, (Game)DbServer.GameId, DbServer.Parameters);
                 // Retry logic:
             } while (pRetryCount++ < SERVER_NOT_RESPONDING_RETRY_COUNT

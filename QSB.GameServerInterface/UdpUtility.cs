@@ -31,7 +31,7 @@ namespace QSB.GameServerInterface
         private int _port;
 
         private int _receiveTimeOut = 3000; // 3 seconds
-        private int _sendTimeOut = 3000; // 10 seconds
+        private int _sendTimeOut = 3000;
         private UdpClient _client;
 
         IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
