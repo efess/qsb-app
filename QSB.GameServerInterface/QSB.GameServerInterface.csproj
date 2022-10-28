@@ -136,6 +136,7 @@
     <Compile Include="Dtls\PskDtlsClient.cs" />
     <Compile Include="Exceptions.cs" />
     <Compile Include="Games\Common\IClothed.cs" />
+    <Compile Include="Games\Common\IPlayerType.cs" />
     <Compile Include="Games\Common\ISkinned.cs" />
     <Compile Include="Games\NetQuake\NetQuake.cs" />
     <Compile Include="Games\NetQuake\NetQuakePlayer.cs" />

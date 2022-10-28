@@ -788,6 +788,7 @@ sd.ServerDataId as ServerDataId
 ,gs.Category as Category
 ,gs.QueryResult as CurrentStatus
 ,gs.CustomModificationName as CustomModificationName
+,gs.Parameters as Parameters
 ,sd.Name as ServerName
 ,sd.Map as Map
 ,sd.ServerSettings as ServerSettings

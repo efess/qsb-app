@@ -81,6 +81,10 @@ namespace QSB.Server
                     playerData.Shirt = (player as IClothed).ShirtColor;
                     playerData.Pant = (player as IClothed).PantColor;
                 }
+                if (player is IPlayerType)
+                {
+                    playerData.PlayerType = (player as IPlayerType).PlayerType;
+                }
 
                 if (!string.IsNullOrEmpty(player.ModelName))
                 {

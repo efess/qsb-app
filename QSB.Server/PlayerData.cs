@@ -1,4 +1,5 @@
-﻿using System;
+﻿using QSB.GameServerInterface.Games.Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,6 +22,7 @@ namespace QSB.Server
         public int Pant { get; set; }
         public string Model { get; set; }
         public string Skin { get; set; }
+        public PlayerType PlayerType { get; set; }
 
     }
 }

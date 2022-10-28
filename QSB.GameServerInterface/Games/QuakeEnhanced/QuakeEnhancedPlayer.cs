@@ -24,11 +24,11 @@ using System.Text;
 
 namespace QSB.GameServerInterface.Games.QuakeEnhanced
 {
-    public class QuakeEnhancedPlayer : PlayerSnapshot, IClothed
+    public class QuakeEnhancedPlayer : PlayerSnapshot, IClothed, IPlayerType
     {
-        // Netquake only properties
         public int ShirtColor { get; internal set; }
         public int PantColor { get; internal set; }
+        public PlayerType PlayerType { get; internal set; }
 
         public QuakeEnhancedPlayer(byte[] pPlayerBytes, string pIpAddress, string pPlayerName, int pPlayerNumber)
             : base(pPlayerBytes, pIpAddress, pPlayerName, pPlayerNumber)

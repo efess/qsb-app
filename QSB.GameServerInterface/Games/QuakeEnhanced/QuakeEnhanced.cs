@@ -20,6 +20,7 @@ using System;
 using System.Text;
 using QSB.GameServerInterface.Packets.NetQuake;
 using Newtonsoft.Json;
+using QSB.GameServerInterface.Games.Common;
 
 namespace QSB.GameServerInterface.Games.QuakeEnhanced
 {
@@ -114,15 +115,25 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
 
             int playerCount = serverInfo.CurrentPlayerCount;
 
-            for (int i = 0; i < playerCount; i++)
+            for (int i = 0, j = 0; i < playerCount; i++, j++)
             {
-                bytesReceived = net.SendBytes(new PlayerInfoRequest(i).GetPacket());
+                try
+                { 
+                    bytesReceived = net.SendBytes(new PlayerInfoRequest(j).GetPacket()); 
+                }
+                catch
+                {
+                    Console.WriteLine("My player hack isn't working ..");
+                    continue;
+                }
+
                 packet = GetReplyPacket(bytesReceived);
 
                 if (!(packet is PlayerInfoReply))
                     throw new Exception("Communications exception");
 
                 PlayerInfoReply reply = packet as PlayerInfoReply;
+                if (reply.Address == "") i--; // this is a hack to account for the playerCount issue when bots are on the server.
                 if (reply.PlayerName == null || reply.PlayerName.Length == 0)
                     break;
 
@@ -180,7 +191,9 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
         {
             QuakeEnhancedPlayer playerInfo = new QuakeEnhancedPlayer(
                 pReplyPacket.PlayerName,
-                pReplyPacket.Address == "LOCAL" ? "HOST" : "private", // LOCAL for host, maybe port for players?
+                pReplyPacket.Address == "LOCAL" ? 
+                    "HOST" : 
+                    pReplyPacket.Address == "" ? "BOT" : "private", // LOCAL for host, maybe port for players?
                 PlayerBytesToString(pReplyPacket.PlayerName),
                 pReplyPacket.PlayerNumber);
 
@@ -189,6 +202,9 @@ namespace QSB.GameServerInterface.Games.QuakeEnhanced
 
             playerInfo.PantColor = (int)pReplyPacket.PantColor;
             playerInfo.ShirtColor = (int)pReplyPacket.ShirtColor;
+            playerInfo.PlayerType = pReplyPacket.Address ==  "LOCAL" ?
+                    PlayerType.Host  :
+                    pReplyPacket.Address == "" ? PlayerType.Bot : PlayerType.Normal;
             playerInfo.PlayTime = TimeSpan.FromSeconds(pReplyPacket.PlayTime);
 
             pServerInfo.Players.Add(playerInfo);
